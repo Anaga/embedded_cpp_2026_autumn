@@ -25,7 +25,13 @@ void setup() {
     Serial.begin(115200U);
     pinMode(LED_PIN, OUTPUT);
     pinMode(BUTTON_PIN, INPUT_PULLUP);
+    delay(SLOW_MS*3);
     digitalWrite(LED_PIN, HIGH);  // start with the LED off
+    delay(SLOW_MS*3);
+    digitalWrite(LED_PIN, LOW);  // set the LED on
+    delay(SLOW_MS*3);
+    digitalWrite(LED_PIN, HIGH);  // put the LED off
+    delay(SLOW_MS*3);
     Serial.println("lesson-02 demo: hold BOOT for fast blink");
 }
 
