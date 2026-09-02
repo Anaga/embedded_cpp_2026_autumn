@@ -3,7 +3,7 @@
 // Everything from today in one program:
 //   - blink the blue status LED (GPIO 8, active low)
 //   - report state over Serial
-// Behaviour: the LED blinks slowly 5 times. 
+// Behaviour: the LED blinks slowly. 
 #include <Arduino.h>
 
 // Board pinout - stays the same in every lesson. See README.md.
@@ -26,38 +26,12 @@ void setup() {
     Serial.println("lesson-02 demo: simple blink");
 }
 
-void loop() {
-    
+void loop() {    
     digitalWrite(LED_PIN, LOW);   // ON (active low)
     Serial.println("LED on 2");
     delay(SLOW_MS);
 
     digitalWrite(LED_PIN, HIGH);  // OFF
     Serial.println("LED off");
-    delay(SLOW_MS);
- 
-    digitalWrite(LED_PIN, LOW);   // ON (active low)
-    Serial.println("LED on 3");
-    delay(SLOW_MS);
-
-    digitalWrite(LED_PIN, HIGH);  // OFF
-    Serial.println("LED off");
-    delay(SLOW_MS);
-    
-    digitalWrite(LED_PIN, LOW);   // ON (active low)
-    Serial.println("LED on 4");
-    delay(SLOW_MS);
-
-    digitalWrite(LED_PIN, HIGH);  // OFF
-    Serial.println("LED off");
-    delay(SLOW_MS);
-
-    digitalWrite(LED_PIN, LOW);   // ON (active low)
-    Serial.println("LED on 5");
-    delay(SLOW_MS);
-
-    digitalWrite(LED_PIN, HIGH);  // OFF
-    Serial.println("LED off");
-    delay(SLOW_MS);
- 
+    delay(SLOW_MS); 
 }
