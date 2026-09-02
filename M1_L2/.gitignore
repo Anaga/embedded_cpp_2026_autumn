@@ -4,3 +4,7 @@
 .vscode/launch.json
 .vscode/ipch
 .DS_*
+
+# CLion / JetBrains project files and local CMake build output
+.idea/
+cmake-build-*/
