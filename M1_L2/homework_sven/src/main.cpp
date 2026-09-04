@@ -4,7 +4,14 @@
 //   three short pulses, three long pulses, three short pulses, a pause,
 //   then the pattern repeats.
 // While the BOOT button is held down, the LED stays off and the
-// pattern does not advance. Releasing the button will restart the pattern.
+// pattern does not advance.
+//
+// Definition of done
+// - The rhythm is readable as SOS from across the room.
+// - Holding BOOT stops the LED; releasing it resumes the pattern.
+// - One line is printed over Serial per completed cycle.
+// - No magic numbers inside `loop()` - timing lives in the named
+//   constants at the top.
 //
 // Full task description and grading notes are in README.md.
 // Wiring: nothing to wire - the LED and the button are on the board.
