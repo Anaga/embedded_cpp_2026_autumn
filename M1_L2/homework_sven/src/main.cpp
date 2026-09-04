@@ -42,7 +42,6 @@ void setup() {
     Serial.begin(115200U);
     pinMode(LED_PIN, OUTPUT);
     pinMode(BUTTON_PIN, INPUT_PULLUP);
-    digitalWrite(LED_PIN, HIGH);
     // Wait for the Serial to initialize
     delay(SHORT_MS);
     Serial.println("lesson-02 homework from sven: SOS blinker");
