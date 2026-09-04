@@ -8,7 +8,6 @@
 //
 // Full task description and grading notes are in README.md.
 // Wiring: nothing to wire - the LED and the button are on the board.
-
 #include <Arduino.h>
 
 // Board pinout - same as the demo.
@@ -31,6 +30,11 @@ static void pulse(uint32_t duration_ms) {
     delay(GAP_MS);
 }
 
+// Returns true if BOOT is currently held down.
+static bool bootHeld() {
+    return digitalRead(BUTTON_PIN) == LOW;
+}
+
 void setup() {
     Serial.begin(115200U);
     pinMode(LED_PIN, OUTPUT);
@@ -40,12 +44,28 @@ void setup() {
 }
 
 void loop() {
-    // TODO: if the BOOT button is held down, keep the LED off and return
-    //       from loop() without playing the pattern.
+    // If BOOT is held, keep the LED off and do not advance the pattern.
+    if (bootHeld()) {
+        digitalWrite(LED_PIN, HIGH);
+        return;
+    }
 
-    // TODO: play one full SOS cycle using pulse():
-    //       three short pulses, three long pulses, three short pulses.
+    // Three short pulses.
+    for (uint8_t i = 0; i < 3U; i++) {
+        if (bootHeld()) { digitalWrite(LED_PIN, HIGH); return; }
+        pulse(SHORT_MS);
+    }
+    // Three long pulses.
+    for (uint8_t i = 0; i < 3U; i++) {
+        if (bootHeld()) { digitalWrite(LED_PIN, HIGH); return; }
+        pulse(LONG_MS);
+    }
+    // Three short pulses.
+    for (uint8_t i = 0; i < 3U; i++) {
+        if (bootHeld()) { digitalWrite(LED_PIN, HIGH); return; }
+        pulse(SHORT_MS);
+    }
 
-    // TODO: after the cycle, print one line over Serial and wait
-    //       PAUSE_MS before the pattern repeats.
+    Serial.println("SOS cycle complete");
+    delay(PAUSE_MS);
 }
