@@ -19,8 +19,8 @@
 #include <Arduino.h>
 
 // Board pinout - same as the demo.
-static const uint8_t LED_PIN = 8U;     // blue status LED, LOW = ON
-static const uint8_t BUTTON_PIN = 9U;  // BOOT button, LOW = pressed
+static const uint8_t LED_PIN = 8U; // blue status LED, LOW = ON
+static const uint8_t BUTTON_PIN = 9U; // BOOT button, LOW = pressed
 
 // Timing constants for the pattern. Tune them if your rhythm
 // does not read as SOS, but keep them named - no magic numbers below.
@@ -32,9 +32,9 @@ static const uint32_t PAUSE_MS = 1000U;
 // Turns the LED on for `duration_ms`, then off for GAP_MS.
 // Provided so the pattern code reads as a sequence of pulses.
 static void pulse(uint32_t duration_ms) {
-    digitalWrite(LED_PIN, LOW);   // ON (active low)
+    digitalWrite(LED_PIN, LOW); // ON (active low)
     delay(duration_ms);
-    digitalWrite(LED_PIN, HIGH);  // OFF
+    digitalWrite(LED_PIN, HIGH); // OFF
     delay(GAP_MS);
 }
 
