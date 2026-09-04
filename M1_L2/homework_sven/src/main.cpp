@@ -53,6 +53,8 @@ void loop() {
     // TODO: play one full SOS cycle using pulse():
     //       three short pulses, three long pulses, three short pulses.
 
-    // TODO: after the cycle, print one line over Serial and wait
-    //       PAUSE_MS before the pattern repeats.
+    // after the cycle, print one line over Serial and wait
+    // PAUSE_MS before the pattern repeats.
+    Serial.println("SOS");
+    delay(PAUSE_MS);
 }
