@@ -4,7 +4,7 @@
 //   three short pulses, three long pulses, three short pulses, a pause,
 //   then the pattern repeats.
 // While the BOOT button is held down, the LED stays off and the
-// pattern does not advance.
+// pattern does not advance. Releasing the button will restart the pattern.
 //
 // Full task description and grading notes are in README.md.
 // Wiring: nothing to wire - the LED and the button are on the board.
@@ -36,7 +36,7 @@ void setup() {
     pinMode(LED_PIN, OUTPUT);
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     digitalWrite(LED_PIN, HIGH);
-    Serial.println("lesson-02 homework: SOS blinker");
+    Serial.println("lesson-02 homework from sven: SOS blinker");
 }
 
 void loop() {
