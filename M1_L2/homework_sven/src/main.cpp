@@ -50,8 +50,19 @@ void loop() {
     // TODO: if the BOOT button is held down, keep the LED off and return
     //       from loop() without playing the pattern.
 
-    // TODO: play one full SOS cycle using pulse():
-    //       three short pulses, three long pulses, three short pulses.
+    // play one full SOS cycle using pulse():
+    // Pulse S - three short pulses
+    pulse(SHORT_MS);
+    pulse(SHORT_MS);
+    pulse(SHORT_MS);
+    // Pulse O - three long pulses
+    pulse(LONG_MS);
+    pulse(LONG_MS);
+    pulse(LONG_MS);
+    // Pulse S - three short pulses
+    pulse(SHORT_MS);
+    pulse(SHORT_MS);
+    pulse(SHORT_MS);
 
     // after the cycle, print one line over Serial and wait
     // PAUSE_MS before the pattern repeats.
