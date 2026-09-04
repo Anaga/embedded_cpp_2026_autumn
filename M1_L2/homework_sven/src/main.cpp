@@ -43,12 +43,19 @@ void setup() {
     pinMode(LED_PIN, OUTPUT);
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     digitalWrite(LED_PIN, HIGH);
+    // Wait for the Serial to initialize
+    delay(SHORT_MS);
     Serial.println("lesson-02 homework from sven: SOS blinker");
 }
 
 void loop() {
-    // TODO: if the BOOT button is held down, keep the LED off and return
-    //       from loop() without playing the pattern.
+    // if the BOOT button is held down, keep the LED off and return
+    // from loop() without playing the pattern.
+    if (digitalRead(BUTTON_PIN) == LOW) {
+        // Wait for the button release
+        delay(SHORT_MS);
+        return;
+    }
 
     // play one full SOS cycle using pulse():
     // Pulse S - three short pulses
