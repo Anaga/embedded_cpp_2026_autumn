@@ -7,19 +7,38 @@ Show the calculation for each problem, then give one final answer with units.
 
 ## Problem 1 - Resistor for a red LED
 
-Given:
+An ESP32-C3 GPIO pin outputs 3.3 V.
 
-- Supply voltage: 3.3 V
-- LED forward voltage: 2.0 V
-- Desired current: 10 mA
+You want to drive a red LED from it. The LED has a forward voltage of 2.0 V,
+and you want 10 mA flowing through it.
+
+The LED and the resistor are in series, so the resistor gets whatever voltage
+the LED does not use.
+
+**What resistor value do you need?**
 
 Working:
 
 ```text
+Given:
 
+- Supply voltage: 3.3 V
+- LED forward voltage: 2.0 V
+- Desired current: 10 mA = 0.01 A
+
+Thinking:
+
+As the LED consumes 2.0V, I will be left with 3.3 V - 2.0 V = 1.3 V for the series resistor.
+
+For the resistor selection I will use Ohms law to use: R = V / I.
+
+R = 1.3 V / 0.01 A = 130 Ohms
+
+I would probably expect at least 5..10% deviation allowance,
+so between 120..140 Ohms would be also fine.
 ```
 
-Answer: <!-- value and unit -->
+Answer: 130 Ohms
 
 ## Problem 2 - Resistor for a blue LED
 
