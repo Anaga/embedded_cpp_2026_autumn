@@ -28,14 +28,13 @@ Given:
 
 Thinking:
 
-As the LED consumes 2.0V, I will be left with 3.3 V - 2.0 V = 1.3 V for the series resistor.
+As the LED drops 2.0V, I will be left with 3.3 V - 2.0 V = 1.3 V for the series resistor.
 
 For the resistor selection I will use Ohms law to use: R = V / I.
 
 R = 1.3 V / 0.01 A = 130 Ohms
 
-I would probably expect at least 5..10% deviation allowance,
-so between 120..140 Ohms would be also fine.
+A nominal 130 Ohms resistor with 5% tolerance may actually be fine in the range 123.5–136.5 Ohms.
 ```
 
 Answer: 130 Ohms
