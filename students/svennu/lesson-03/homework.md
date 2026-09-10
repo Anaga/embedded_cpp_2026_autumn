@@ -43,16 +43,37 @@ Answer: 130 ohms
 
 ## Problem 2 - Resistor for a blue LED
 
-Given:
+Same 3.3 V GPIO pin. This time a blue LED with a forward voltage of 3.0 V, and
+you want 15 mA through it.
 
-- Supply voltage: 3.3 V
-- LED forward voltage: 3.0 V
-- Desired current: 15 mA
+**What resistor value do you need?**
+
+Answer:
+
+Look at how much smaller this answer is than the one in problem 1, and think
+about why. This is the practical consequence of blue LEDs having a high forward
+voltage: on a 3.3 V supply there is almost nothing left over.
 
 Working:
 
 ```text
+Given:
 
+- Supply voltage: 3.3 V
+- LED forward voltage: 3.0 V
+- Desired current: 15 mA = 0.015 A
+
+Thinking:
+
+The LED drops 3.0 V, leaving 3.3 V - 3.0 V = 0.3 V across the series resistor.
+
+To select the resistor, I will use Ohm's law: R = V / I.
+
+R = 0.3 V / 0.015 A = 20 ohms
+
+A nominal 20-ohm resistor with a 5% tolerance can have an actual resistance
+between 19 and 21 ohms, so the actual current may differ slightly from
+the desired 15 mA.
 ```
 
 Answer: <!-- value and unit -->
