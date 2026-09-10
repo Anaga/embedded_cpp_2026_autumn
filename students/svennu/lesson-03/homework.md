@@ -76,7 +76,7 @@ between 19 and 21 ohms, so the actual current may differ slightly from
 the desired 15 mA.
 ```
 
-Answer: <!-- value and unit -->
+Answer: 20 ohms
 
 ## Problem 3 - Power in the resistor
 
