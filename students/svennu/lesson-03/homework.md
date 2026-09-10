@@ -80,17 +80,38 @@ Answer: 20 ohms
 
 ## Problem 3 - Power in the resistor
 
-Use the resistor value from problem 1 with a current of 10 mA.
+Take the resistor value you calculated in problem 1, carrying the same 10 mA.
+
+Some of the energy passing through a resistor becomes heat. How much depends on
+the current and the resistance:
+
+```
+P = I * I * R
+```
+
+**How much power is dissipated in that resistor?**
+
+Answer:
+
+A standard through-hole resistor is usually rated for 0.25 W. Compare your
+answer to that rating and decide whether the resistor is safe to use.
 
 Working:
 
 ```text
+From the problem 1:
+- resistor: 130 ohms
+- carrying: 10 mA = 0.01A
 
+We need to find the power (watts, W) dissipated by the resistor using: P = I * I * R
+
+P = 0.01 A * 0.01 A * 130 ohms = 0.013 W
 ```
 
-Answer: <!-- value and unit -->
+Answer: 0.013 W
 
-Is a standard 0.25 W resistor safe to use? <!-- yes/no and brief reason -->
+Is a standard 0.25 W resistor safe to use? Yes. The resistor is dissipating 0.013 W,
+which is roughly 5% of its maximum 0.25 W power handling capacity.
 
 ## Problem 4 - From measurement back to theory
 
