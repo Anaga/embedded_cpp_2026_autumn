@@ -28,16 +28,18 @@ Given:
 
 Thinking:
 
-As the LED drops 2.0V, I will be left with 3.3 V - 2.0 V = 1.3 V for the series resistor.
+The LED drops 2.0 V, leaving 3.3 V - 2.0 V = 1.3 V across the series resistor.
 
-For the resistor selection I will use Ohms law to use: R = V / I.
+To select the resistor, I will use Ohm's law: R = V / I.
 
-R = 1.3 V / 0.01 A = 130 Ohms
+R = 1.3 V / 0.01 A = 130 ohms
 
-A nominal 130 Ohms resistor with 5% tolerance may actually be fine in the range 123.5–136.5 Ohms.
+A nominal 130-ohm resistor with a 5% tolerance can have an actual resistance
+between 123.5 and 136.5 ohms, so the actual current may differ slightly from
+the desired 10 mA.
 ```
 
-Answer: 130 Ohms
+Answer: 130 ohms
 
 ## Problem 2 - Resistor for a blue LED
 
