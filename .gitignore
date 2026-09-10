@@ -71,3 +71,7 @@ Testing/
 # Mack OS files
 .DS_Store
 ._* 
+
+# CLion / JetBrains project files and local CMake build output
+.idea/
+cmake-build-*/
