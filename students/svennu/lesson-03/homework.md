@@ -185,15 +185,41 @@ Answer: See last section in 'Working'.
 
 ## Problem 5 - Pull-up resistor sizing
 
-Given:
+Harder. Attempt it after the first four.
 
-- Supply voltage: 3.3 V
-- Maximum current: 0.5 mA
+A pull-up resistor connects a GPIO input to 3.3 V. When a button is pressed and
+pulls that pin down to GND, current flows through the pull-up resistor
+continuously, for as long as the button is held. On a battery powered device
+that wasted current matters.
+
+You want that current to stay below 0.5 mA.
+
+**What is the minimum pull-up resistor value that satisfies this?**
+
+Answer:
+
+There is a limit at the other end too. Making the pull-up very large reduces the
+wasted current further, but the pin becomes slow to return to HIGH and more
+easily disturbed by electrical noise. In the water analogy: a very narrow pipe
+takes a long time to bring the pressure back up. Typical real pull-up values
+sit between 4.7 kohm and 47 kohm for this reason.
 
 Working:
 
 ```text
+Given:
 
+- Supply voltage: 3.3 V
+- Maximum current: 0.5 mA (below!)
+
+Need to find the smallest resistance that limits the button-pressed current to 0.5 mA.
+
+R = V / I = 3.3 V / (0.5 / 1000) A = 6600 ohms = 6.6 kohm.
+
+So 6.6 kohm is the boundary value. Because the wording says "below 0.5 mA",
+ a practical standard choice would be the next value above it constraining in 5% tolerance.
+I would use a common 8.2 kohm resistor landing safely below 0.5 mA to 0.40 mA with allowed tolerance:
+I = V / R = 3.3V / (8.2 * 1000) = 0.00040 A = 0.40 mA
 ```
 
-Answer: <!-- minimum value and unit -->
+Answer: 8.2 kohm
