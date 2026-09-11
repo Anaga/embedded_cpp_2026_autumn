@@ -115,33 +115,73 @@ which is roughly 5% of its maximum 0.25 W power handling capacity.
 
 ## Problem 4 - From measurement back to theory
 
+In class you measured current through a 1 kohm resistor. Suppose the
+measurement was 3.2 mA at 3.3 V.
+
+**What is the actual resistance, calculated from that measurement?**
+
+Answer:
+
+Compare it to the nominal 1000 ohm. Common resistors have a 5 percent
+tolerance, which means anything from 950 to 1050 ohm is a resistor behaving
+exactly as specified. Decide whether your calculated value falls inside that
+range, and if it does not, think about where else the error could come from.
+
+Then repeat the calculation with the numbers you actually measured in class.
+
+Working:
+
+```text
 Given example measurement:
 
 - Voltage: 3.3 V
 - Current: 3.2 mA
 
-Working:
+By Ohm's law the calculated measurement of the resistance is:
+ R = V / A = 3.3 V / ( 3.2 / 1000 ) A = 1031.25 ohms
 
-```text
+Nominal resistance was 1000 ohm with 5% tolerance range:
+ 1000 ohm +/- 5% = 1000 ohm +/- 50 ohm = 950..1050 ohm.
 
+The calculated value of 1031.25 ohms falls inside the specified tolerance range of
+950..1050 ohm. The resistor is behaving exactly within its manufactured specification.
 ```
 
-Answer: <!-- value and unit -->
+Answer: 1031.25 ohms
 
-Is the result within the 950-1050 ohm tolerance range? <!-- yes/no -->
+Is the result within the 950-1050 ohm tolerance range? yes
 
 ### Calculation using my class measurement
 
-Measured voltage: <!-- value and unit -->  
-Measured current: <!-- value and unit -->
+Measured voltage: 3.3V
+Measured current: 3.2 mA
 
 Working:
 
 ```text
+I setup my own circuit w ESP32-c3 for power: 3.3V - resistor - LED - GND
 
+- Voltage: 3.28 (reading from the board)
+- Resistors:
+-   1. expected 2200 ohm: measured as: 2.17 kohm = 2170 ohm
+-   2. expected 560 ohm: measured as: 0.547 kohm = 547 ohm
+- LED voltage drop: 1.8 V (reading between the anode and cathode)
+- Board load: SOS code working on the board, blue led blinking
+
+Two resistors were used:
+1. 2170 ohm resistor: mA measurement: 0.6 mA
+2.  547 ohm resistor: mA measurement: 1.8 mA
+
+Let's see if all fits into Ohm's law:
+1. R = V / A = (3.28 - 1.8) / (0.6 / 1000) = 2467 ohm
+2467 ohm is off the 5% tolerance range of expected 2200 ohm. I expect I have a measurement error,
+probably not knowing the proper LED voltage drop or simply a noisy setup.
+2. R = V / A = (3.28 - 1.8) / (1.8 / 1000) = 822 ohm
+822 ohm is off the 5% tolerance range of expected 560 ohm. I expect I have a measurement error,
+probably not knowing the proper LED voltage drop or simply a noisy setup.
 ```
 
-Answer: <!-- value and unit -->
+Answer: See last section in 'Working'.
 
 ## Problem 5 - Pull-up resistor sizing
 
