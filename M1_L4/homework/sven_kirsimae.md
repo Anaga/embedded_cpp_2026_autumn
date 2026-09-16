@@ -53,7 +53,7 @@ when GPIO 9 is low at reset?
 
 This one is a name, not a number. Give the mode name and the table.
 
-Q6: `<mode name>`   (Table `<table number>`, page `<page number>`)
+Q6: `Joint Download Boot mode (note that when GPIO9 is LOW, GPIO8 must be HIGH, and GPIO2 is recommended HIGH)` (`Table 3-3. Chip Boot Mode Control` column `GPIO9`, looking at value `0`, page `31`)
 
 ## Comparison with lesson 03, problem 5
 
@@ -63,5 +63,5 @@ minimum pull-up value that keeps the wasted current under 0.5 mA.
 Is the real internal pull-up above or below your floor? By how much? One short
 sentence on why a chip designer would pick the value they did.
 
-`<Compare the internal pull-up with the calculated minimum value of 8.2 kohm
-and briefly explain the design choice.>`
+`The 45 kohm internal pull-up is 36.8 kohm above my 8.2 kohm floor. That's about 5.5 times higher.
+This reduces the current to approximately 0.073 mA while still providing a reliable default HIGH level.`
