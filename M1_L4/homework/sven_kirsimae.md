@@ -37,7 +37,7 @@ Q3: `0.25 x VDD = 0.25 x 3.3 V = 0.825 V` (`Table 5-4. DC Characteristics (3.3 V
 Careful here. This one is not in the Electrical Characteristics section, and
 several pins have a different value. Read the note, not just the table body.
 
-Q4: `<value>`   (Table `<table number>`, page `<page number>`)
+Q4: `20 mA` (`Table 2-1. Pin Overview`, page `17`, the `Pin Providing Power` column header refers to note `4: The default drive strength for each pin`)
 
 ## Q5 - Maximum cumulative IO output current
 
