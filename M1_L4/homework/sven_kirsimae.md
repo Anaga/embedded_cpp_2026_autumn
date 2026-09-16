@@ -14,7 +14,7 @@ GitHub username: `svennu`
 
 **Question:** What is the internal weak pull-up resistance (RPU) of a GPIO pin?
 
-Q1: `<value>`   (Table `<table number>`, page `<page number>`)
+Q1: `45 kohm`   (`Table 5-4. DC Characteristics (3.3 V, 25 °C)`, page `55`)
 
 ## Q2 - Minimum high-level input voltage
 
