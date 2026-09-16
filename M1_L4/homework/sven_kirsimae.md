@@ -8,7 +8,7 @@ GitHub username: `svennu`
 
 - Required source: ESP32-C3 Series Datasheet, version 2.4
 - Official lookup page: https://www.espressif.com/en/support/documents/technical-documents
-- Workgin with document: https://documentation.espressif.com/esp32-c3_datasheet_en.pdf
+- Working with document: https://documentation.espressif.com/esp32-c3_datasheet_en.pdf
 
 ## Q1 - Internal weak pull-up resistance
 
