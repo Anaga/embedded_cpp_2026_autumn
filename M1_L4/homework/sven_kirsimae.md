@@ -28,11 +28,7 @@ Q2: `0.75 x VDD = 0.75 x 3.3 V = 2.475 V` (`Table 5-4. DC Characteristics (3.3 V
 **Question:** What is the maximum low-level input voltage (VIL)? Again, formula
 and the value for VDD = 3.3 V.
 
-Formula: `<formula as printed>`
-
-Value for VDD = 3.3 V: `<value>`
-
-Source: Table `<table number>`, page `<page number>`
+Q3: `0.25 x VDD = 0.25 x 3.3 V = 0.825 V` (`Table 5-4. DC Characteristics (3.3 V, 25 °C)` parameter `VIL`, column `max`, page `55`)
 
 ## Q4 - Default drive strength of GPIO 8
 
