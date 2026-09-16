@@ -21,7 +21,7 @@ Q1: `45 kohm` (`Table 5-4. DC Characteristics (3.3 V, 25 °C)`, page `55`)
 **Question:** What is the minimum high-level input voltage (VIH)? Give the
 formula as printed and the value for VDD = 3.3 V.
 
-Q2: `0.75 x VDD = 0.75 x 3.3 V = 2.475 V` (`Table 5-4. DC Characteristics (3.3 V, 25 °C), min column`, page `55`)
+Q2: `0.75 x VDD = 0.75 x 3.3 V = 2.475 V` (`Table 5-4. DC Characteristics (3.3 V, 25 °C), parameter VIH, min column`, page `55`)
 
 ## Q3 - Maximum low-level input voltage
 
