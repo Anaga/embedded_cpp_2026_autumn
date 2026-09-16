@@ -44,7 +44,7 @@ Q4: `20 mA` (`Table 2-1. Pin Overview`, page `17`, the `Pin Providing Power` col
 **Question:** What is the maximum cumulative IO output current for the whole
 chip - the absolute maximum rating, across all pins together?
 
-Q5: `<value>`   (Table `<table number>`, page `<page number>`)
+Q5: `1000 mA` (`Table 5-1. Absolute Maximum Ratings` parameter `Ioutput`, column `max`, page `54`)
 
 ## Q6 - Boot mode when GPIO 9 is low at reset
 
