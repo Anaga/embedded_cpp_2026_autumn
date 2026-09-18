@@ -122,6 +122,9 @@ static int16_t fahrenheitToCelsiusInTenths(int16_t fahrenheit) {
  * holds the Fahrenheit value in loop() from int16_t to int8_t. Turn the knob
  * all the way up and write down what you see, and why. Put the answer in your
  * commit message.
+ *
+ * Reasoning: int8_t holds −128 through +127, but the knob reaches can reach +140
+ * where it would then overflow into negative numbers, like: 140 − 256 = −116.
  */
 
 // ---------------------------------------------------------------------------
