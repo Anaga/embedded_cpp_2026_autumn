@@ -118,7 +118,7 @@ static int16_t fahrenheitToCelsiusInTenths(int16_t fahrenheit) {
 }
 
 /*
- * TODO 3 (bonus, nothing to write): change the type of the variable that
+ * (bonus, nothing to write): change the type of the variable that
  * holds the Fahrenheit value in loop() from int16_t to int8_t. Turn the knob
  * all the way up and write down what you see, and why. Put the answer in your
  * commit message.
