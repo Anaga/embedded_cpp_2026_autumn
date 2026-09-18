@@ -24,6 +24,14 @@
 #include <stdint.h>
 
 // ---------------------------------------------------------------------------
+// "NO MAGIC NUMBERS INSIDE FUNCTIONS” RULE
+// ---------------------------------------------------------------------------
+
+static const uint8_t F_TO_C_OFFSET = 32;
+static const uint8_t F_TO_C_NUMERATOR = 5;
+static const uint8_t F_TO_C_DENOMINATOR = 9;
+
+// ---------------------------------------------------------------------------
 // CONFIGURATION - already set up for you
 // ---------------------------------------------------------------------------
 
@@ -83,7 +91,7 @@ static int16_t mapToFahrenheit(uint16_t counts) {
 // ---------------------------------------------------------------------------
 
 /*
- * TODO 1: return the same temperature in whole degrees Celsius.
+ * Return the same temperature in whole degrees Celsius.
  *
  * The formula is on the board. Getting it into C is the exercise:
  * the order of the operations decides whether the answer is right.
@@ -91,8 +99,7 @@ static int16_t mapToFahrenheit(uint16_t counts) {
  * Replace the return value below.
  */
 static int16_t fahrenheitToCelsius(int16_t fahrenheit) {
-    (void)fahrenheit;  // remove this line once you use the parameter
-    return 0;
+    return (int16_t) ((fahrenheit - F_TO_C_OFFSET) * F_TO_C_NUMERATOR / F_TO_C_DENOMINATOR);
 }
 
 /*
