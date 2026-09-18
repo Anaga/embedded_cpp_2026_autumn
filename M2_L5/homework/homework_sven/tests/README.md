@@ -22,7 +22,7 @@ Google Test 1.17.0 in this project's `.pio` directory on the first run.
 To run only conversion cases from `tests`:
 
 ```sh
-~/.platformio/penv/bin/pio test -e native -a '--gtest_filter=Temperatures/CelsiusConversion.*'
+~/.platformio/penv/bin/pio test -e native -a '--gtest_filter=Temperatures/Celsius*.*'
 ```
 
 ## CLion
@@ -42,8 +42,12 @@ The first build downloads Google Test.
 
 Edit `test/test_temperature/test_main.cpp`:
 
-- Conversion cases: add `{fahrenheit, expected_celsius}` rows to `CELSIUS_CASES`.
-  Expected whole-degree results truncate toward zero.
+- Whole degrees: add `{fahrenheit, expected_celsius}` rows to `CELSIUS_CASES`.
+- Tenths: add `{fahrenheit, expected_tenths}` rows to `CELSIUS_TENTHS_CASES`.
+  Both conversions truncate toward zero; 39 F gives 3 C or 38 tenths C.
+- Serial output: add `{adc_counts, expected_output}` rows to `LOOP_OUTPUT_CASES`.
+  Checks require signed F/C/Ctenths values and one decimal digit for Ctenths;
+  padding and line breaks are flexible, including a second Ctenths line.
 - Other checks: add a `TEST_F(HomeworkTest, DescriptiveName)`. Use `fake_arduino`
   for ADC readings, simulated time and captured serial output.
 

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <ostream>
+#include <sstream>
 #include <string>
 
 // Include once so the assignment's static functions can be tested unchanged.
@@ -141,12 +142,131 @@ INSTANTIATE_TEST_SUITE_P(
                temperatureName(info.param.expected_celsius);
     });
 
+struct CelsiusTenthsCase {
+    int16_t fahrenheit;
+    int16_t expected_tenths;
+};
+
+// Expected results truncate toward zero at one decimal place. The full
+// int16_t Fahrenheit extremes would need a wider return type for tenths.
+static constexpr CelsiusTenthsCase CELSIUS_TENTHS_CASES[] = {
+    {-40, -400},
+    {-39, -394},
+    {-31, -350},
+    {-22, -300},
+    {-4, -200},
+    {0, -177},
+    {14, -100},
+    {23, -50},
+    {29, -16},
+    {30, -11},
+    {31, -5},
+    {32, 0},
+    {33, 5},
+    {34, 11},
+    {35, 16},
+    {36, 22},
+    {39, 38},
+    {50, 100},
+    {59, 150},
+    {68, 200},
+    {72, 222},
+    {77, 250},
+    {86, 300},
+    {95, 350},
+    {104, 400},
+    {122, 500},
+    {131, 550},
+    {139, 594},
+    {140, 600},
+    {141, 605},
+    {212, 1000},
+};
+
+void PrintTo(const CelsiusTenthsCase& value, std::ostream* output) {
+    *output << value.fahrenheit << " F -> " << value.expected_tenths << " tenths C";
+}
+
+class CelsiusTenthsConversion : public HomeworkTest,
+                                public ::testing::WithParamInterface<CelsiusTenthsCase> {};
+
+TEST_P(CelsiusTenthsConversion, ConvertsToTenthsOfADegree) {
+    const CelsiusTenthsCase& value = GetParam();
+    EXPECT_EQ(value.expected_tenths, fahrenheitToCelsiusInTenths(value.fahrenheit));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Temperatures,
+    CelsiusTenthsConversion,
+    ::testing::ValuesIn(CELSIUS_TENTHS_CASES),
+    [](const ::testing::TestParamInfo<CelsiusTenthsCase>& info) {
+        return "F" + temperatureName(info.param.fahrenheit) + "ToTenths" +
+               temperatureName(info.param.expected_tenths);
+    });
+
 static void pollAtNextPeriod(uint16_t counts) {
     fake_arduino::serial_output.clear();
     fake_arduino::analog_counts = counts;
     fake_arduino::advanceMilliseconds(PRINT_PERIOD_MS);
     loop();
 }
+
+struct LoopOutputCase {
+    uint16_t adc_counts;
+    const char* expected_output;
+};
+
+// Padding and line breaks are flexible; values, signs, labels and the single
+// decimal digit must match. Each row starts with freshly reset firmware state.
+static const LoopOutputCase LOOP_OUTPUT_CASES[] = {
+    {0U,    "F = -40 C = -40 Ctenths = -40.0"},
+    {856U,  "F = +0 C = -17 Ctenths = -17.7"},
+    {1348U, "F = +23 C = -5 Ctenths = -5.0"},
+    {1498U, "F = +30 C = -1 Ctenths = -1.1"},
+    {1519U, "F = +31 C = +0 Ctenths = -0.5"},
+    {1540U, "F = +32 C = +0 Ctenths = +0.0"},
+    {1562U, "F = +33 C = +0 Ctenths = +0.5"},
+    {1583U, "F = +34 C = +1 Ctenths = +1.1"},
+    {1690U, "F = +39 C = +3 Ctenths = +3.8"},
+    {1925U, "F = +50 C = +10 Ctenths = +10.0"},
+    {2400U, "F = +72 C = +22 Ctenths = +22.2"},
+    {3829U, "F = +139 C = +59 Ctenths = +59.4"},
+    {3850U, "F = +140 C = +60 Ctenths = +60.0"},
+    {4095U, "F = +140 C = +60 Ctenths = +60.0"},
+};
+
+void PrintTo(const LoopOutputCase& value, std::ostream* output) {
+    *output << value.adc_counts << " ADC counts -> " << value.expected_output;
+}
+
+class LoopOutput : public HomeworkTest,
+                   public ::testing::WithParamInterface<LoopOutputCase> {};
+
+TEST_P(LoopOutput, PrintsSignedTemperaturesWithOneDecimalDigit) {
+    const LoopOutputCase& value = GetParam();
+    pollAtNextPeriod(value.adc_counts);
+
+    // Treat spaces, tabs and newlines as separators so either a single line
+    // or a second Ctenths line is accepted, without fixing column widths.
+    std::istringstream output(fake_arduino::serial_output);
+    std::string actual;
+    std::string token;
+    while (output >> token) {
+        if (!actual.empty()) {
+            actual += ' ';
+        }
+        actual += token;
+    }
+    EXPECT_EQ(value.expected_output, actual);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Readings,
+    LoopOutput,
+    ::testing::ValuesIn(LOOP_OUTPUT_CASES),
+    [](const ::testing::TestParamInfo<LoopOutputCase>& info) {
+        return "Adc" + std::to_string(info.param.adc_counts);
+    });
 
 TEST_F(HomeworkTest, LoopFirstZeroReadingPrintsAtExactPeriod) {
     // Test boot-relative times without setup()'s startup delay.
@@ -218,9 +338,8 @@ TEST_F(HomeworkTest, LoopPrintPeriodSurvivesMillisRollover) {
 
 TEST_F(HomeworkTest, LoopPrintsTheConvertedCelsiusValue) {
     pollAtNextPeriod(1925U);
-    // This integration check will also fail until TODO 1 is implemented.
-    EXPECT_STREQ("F =  +50   C =  +10\n",
-                 fake_arduino::serial_output.c_str());
+    // Allow the additional Ctenths field; LoopOutput checks the full reading.
+    EXPECT_EQ(0U, fake_arduino::serial_output.find("F =  +50   C =  +10"));
 }
 
 TEST_F(HomeworkTest, LoopWaitsBetweenPrintsAndSuppressesUnchangedReadings) {
@@ -228,8 +347,7 @@ TEST_F(HomeworkTest, LoopWaitsBetweenPrintsAndSuppressesUnchangedReadings) {
     fake_arduino::serial_output.clear();
     fake_arduino::analog_counts = 1540U;
     loop();
-    EXPECT_STREQ("F =  +32   C =   +0\n",
-                 fake_arduino::serial_output.c_str());
+    EXPECT_EQ(0U, fake_arduino::serial_output.find("F =  +32   C =   +0"));
 
     fake_arduino::serial_output.clear();
     fake_arduino::analog_counts = 3850U;

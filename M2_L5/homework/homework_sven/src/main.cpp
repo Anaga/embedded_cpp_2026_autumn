@@ -22,6 +22,7 @@
 
 #include <Arduino.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 // ---------------------------------------------------------------------------
 // "NO MAGIC NUMBERS INSIDE FUNCTIONS” RULE
@@ -30,6 +31,7 @@
 static const uint8_t F_TO_C_OFFSET = 32;
 static const uint8_t F_TO_C_NUMERATOR = 5;
 static const uint8_t F_TO_C_DENOMINATOR = 9;
+static const int32_t TENTHS_PER_DEGREE = 10;
 
 // ---------------------------------------------------------------------------
 // CONFIGURATION - already set up for you
@@ -99,16 +101,21 @@ static int16_t mapToFahrenheit(uint16_t counts) {
  * Replace the return value below.
  */
 static int16_t fahrenheitToCelsius(int16_t fahrenheit) {
+    // Note the duplication/similarity with fahrenheitToCelsiusInTenths
     return (int16_t) ((fahrenheit - F_TO_C_OFFSET) * F_TO_C_NUMERATOR / F_TO_C_DENOMINATOR);
 }
 
 /*
- * TODO 2 (bonus): tenths of a degree.
+ * Tenths of a degree.
  *
  * Write a second function that returns Celsius in tenths, so that 21.5 C
  * comes back as 215. Print it as a whole part and one digit after the point.
  * Still no float.
  */
+static int16_t fahrenheitToCelsiusInTenths(int16_t fahrenheit) {
+    // Note the duplication/similarity with fahrenheitToCelsius
+    return (int16_t) ((fahrenheit - F_TO_C_OFFSET) * F_TO_C_NUMERATOR * TENTHS_PER_DEGREE / F_TO_C_DENOMINATOR);
+}
 
 /*
  * TODO 3 (bonus, nothing to write): change the type of the variable that
@@ -161,5 +168,15 @@ void loop(void) {
 
     const int16_t celsius = fahrenheitToCelsius(fahrenheit);
 
-    Serial.printf("F = %+4d   C = %+4d\n", (int)fahrenheit, (int)celsius);
+    const int16_t celsiusTenths = fahrenheitToCelsiusInTenths(fahrenheit);
+    const int16_t celsiusTenthsMagnitude = (int16_t) abs(celsiusTenths);
+    const int16_t celsiusTenthsWhole = (int16_t) (celsiusTenthsMagnitude / TENTHS_PER_DEGREE);
+    const int16_t celsiusTenthsFraction = (int16_t) (celsiusTenthsMagnitude % TENTHS_PER_DEGREE);
+
+    Serial.printf("F = %+4d   C = %+4d   Ctenths = %s%d.%d\n",
+                  (int) fahrenheit, (int) celsius,
+                  celsiusTenths >= 0 ? "+" : "-",
+                  (int) celsiusTenthsWhole,
+                  (int) celsiusTenthsFraction
+    );
 }
