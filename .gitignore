@@ -75,3 +75,6 @@ Testing/
 # CLion / JetBrains project files and local CMake build output
 .idea/
 cmake-build-*/
+
+# VSCode staff
+*.vscode/
