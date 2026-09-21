@@ -43,8 +43,8 @@ static const uint32_t UPDATE_PERIOD_MS = 250U;
 static const uint16_t ADC_MIN_COUNTS = 0U;
 static const uint16_t ADC_MAX_COUNTS = 3850U;
 
-static const int16_t C_MIN = -40;
-static const int16_t C_MAX = 140;
+static const int16_t C_MIN = -30;
+static const int16_t C_MAX = 120;
 
 // A colour is three bits: bit 0 red, bit 1 green, bit 2 blue.
 static const uint8_t BIT_RED = 0x01U;
