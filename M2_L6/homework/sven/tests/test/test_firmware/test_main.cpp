@@ -63,14 +63,14 @@ TEST_F(FirmwareTest, ReadPotentiometer) {
 
 TEST_F(FirmwareTest, MapToCelsius) {
     struct Row { uint16_t counts; int16_t celsius; };
-    // Literal checkpoints for the active code's -30..120 range, including
+    // Literal checkpoints for the -40..140 range, including
     // truncation before the negative offset and saturation above 3850 counts.
     const Row rows[] = {
-        {0, -30}, {1, -30}, {25, -30}, {26, -29}, {256, -21}, {257, -20},
-        {744, -2}, {745, -1}, {769, -1}, {770, 0}, {771, 0},
-        {1924, 44}, {1925, 45}, {1926, 45}, {2309, 59}, {2310, 60},
-        {3079, 89}, {3080, 90}, {3593, 109}, {3594, 110},
-        {3849, 119}, {3850, 120}, {3851, 120}, {4095, 120}, {65535, 120},
+        {0, -40}, {1, -40}, {21, -40}, {22, -39}, {213, -31}, {214, -30},
+        {834, -2}, {835, -1}, {855, -1}, {856, 0}, {857, 0},
+        {1924, 49}, {1925, 50}, {1926, 50}, {2138, 59}, {2139, 60},
+        {2780, 89}, {2781, 90}, {3208, 109}, {3209, 110},
+        {3849, 139}, {3850, 140}, {3851, 140}, {4095, 140}, {65535, 140},
     };
     for (const auto& row : rows) {
         SCOPED_TRACE(row.counts);
@@ -132,14 +132,15 @@ TEST_F(FirmwareTest, PrintBinary) {
 }
 
 TEST_F(FirmwareTest, ColourForTemperature) {
-    // Characterize the unfinished exercise as requested: the code wins over
-    // README bands. Update this table when the exercise is implemented.
+    // TODO 1's README bands, including each boundary and the int16_t extremes.
+    // Expected masks: blue 0x04, cyan 0x06, green 0x02, yellow 0x03, red 0x01.
     struct Row { int16_t celsius; uint8_t colour; };
     const Row rows[] = {
-        {-32768, 0}, {-40, 0}, {-31, 0}, {-30, 0}, {-29, 0}, {-1, 0},
-        {0, 0}, {1, 0}, {59, 0}, {60, 0}, {61, 0}, {89, 0}, {90, 0}, {91, 0},
-        {109, 0}, {110, 0}, {111, 0}, {119, 0}, {120, 0}, {121, 0},
-        {140, 0}, {32767, 0},
+        {-32768, 0x04}, {-40, 0x04}, {-31, 0x04}, {-30, 0x04}, {-29, 0x04}, {-1, 0x04},
+        {0, 0x06}, {1, 0x06}, {30, 0x06}, {59, 0x06},
+        {60, 0x02}, {61, 0x02}, {75, 0x02}, {89, 0x02},
+        {90, 0x03}, {91, 0x03}, {100, 0x03}, {109, 0x03}, {110, 0x01}, {111, 0x01},
+        {119, 0x01}, {120, 0x01}, {121, 0x01}, {140, 0x01}, {32767, 0x01},
     };
     for (const auto& row : rows) {
         SCOPED_TRACE(row.celsius);
@@ -204,37 +205,38 @@ TEST_F(FirmwareTest, Loop) {
         uint16_t counts;
         bool updates;
         const char* text;
+        std::array<uint8_t, 3> levels;  // Red, green, blue; LOW switches a channel on.
     };
     const Row rows[] = {
         {0, 0, 4095, false, ""}, {0, 1, 4095, false, ""},
         {0, 249, 4095, false, ""},
-        {0, 250, 0, true, "C =  -30   colour = 00000000\r\n"},
-        {0, 251, 4095, true, "C = +120   colour = 00000000\r\n"},
+        {0, 250, 0, true, "C =  -40   colour = 00000100\r\n", {HIGH, HIGH, LOW}},
+        {0, 251, 4095, true, "C = +140   colour = 00000001\r\n", {LOW, HIGH, HIGH}},
         {1000, 1249, 0, false, ""},
-        {1000, 1250, 1925, true, "C =  +45   colour = 00000000\r\n"},
-        {1000, 1251, 3850, true, "C = +120   colour = 00000000\r\n"},
-        {0, 250, 1, true, "C =  -30   colour = 00000000\r\n"},
-        {0, 250, 25, true, "C =  -30   colour = 00000000\r\n"},
-        {0, 250, 26, true, "C =  -29   colour = 00000000\r\n"},
-        {0, 250, 769, true, "C =   -1   colour = 00000000\r\n"},
-        {0, 250, 770, true, "C =   +0   colour = 00000000\r\n"},
-        {0, 250, 771, true, "C =   +0   colour = 00000000\r\n"},
-        {0, 250, 1924, true, "C =  +44   colour = 00000000\r\n"},
-        {0, 250, 1926, true, "C =  +45   colour = 00000000\r\n"},
-        {0, 250, 2309, true, "C =  +59   colour = 00000000\r\n"},
-        {0, 250, 2310, true, "C =  +60   colour = 00000000\r\n"},
-        {0, 250, 3079, true, "C =  +89   colour = 00000000\r\n"},
-        {0, 250, 3080, true, "C =  +90   colour = 00000000\r\n"},
-        {0, 250, 3593, true, "C = +109   colour = 00000000\r\n"},
-        {0, 250, 3594, true, "C = +110   colour = 00000000\r\n"},
-        {0, 250, 3849, true, "C = +119   colour = 00000000\r\n"},
-        {0, 250, 3851, true, "C = +120   colour = 00000000\r\n"},
+        {1000, 1250, 1925, true, "C =  +50   colour = 00000110\r\n", {HIGH, LOW, LOW}},
+        {1000, 1251, 3850, true, "C = +140   colour = 00000001\r\n", {LOW, HIGH, HIGH}},
+        {0, 250, 1, true, "C =  -40   colour = 00000100\r\n", {HIGH, HIGH, LOW}},
+        {0, 250, 21, true, "C =  -40   colour = 00000100\r\n", {HIGH, HIGH, LOW}},
+        {0, 250, 22, true, "C =  -39   colour = 00000100\r\n", {HIGH, HIGH, LOW}},
+        {0, 250, 855, true, "C =   -1   colour = 00000100\r\n", {HIGH, HIGH, LOW}},
+        {0, 250, 856, true, "C =   +0   colour = 00000110\r\n", {HIGH, LOW, LOW}},
+        {0, 250, 857, true, "C =   +0   colour = 00000110\r\n", {HIGH, LOW, LOW}},
+        {0, 250, 1924, true, "C =  +49   colour = 00000110\r\n", {HIGH, LOW, LOW}},
+        {0, 250, 1926, true, "C =  +50   colour = 00000110\r\n", {HIGH, LOW, LOW}},
+        {0, 250, 2138, true, "C =  +59   colour = 00000110\r\n", {HIGH, LOW, LOW}},
+        {0, 250, 2139, true, "C =  +60   colour = 00000010\r\n", {HIGH, LOW, HIGH}},
+        {0, 250, 2780, true, "C =  +89   colour = 00000010\r\n", {HIGH, LOW, HIGH}},
+        {0, 250, 2781, true, "C =  +90   colour = 00000011\r\n", {LOW, LOW, HIGH}},
+        {0, 250, 3208, true, "C = +109   colour = 00000011\r\n", {LOW, LOW, HIGH}},
+        {0, 250, 3209, true, "C = +110   colour = 00000001\r\n", {LOW, HIGH, HIGH}},
+        {0, 250, 3849, true, "C = +139   colour = 00000001\r\n", {LOW, HIGH, HIGH}},
+        {0, 250, 3851, true, "C = +140   colour = 00000001\r\n", {LOW, HIGH, HIGH}},
         // 4294967196 is 100 ms before rollover; these are elapsed 249/250/251.
         {4294967196U, 4294967445ULL, 0, false, ""},
-        {4294967196U, 4294967446ULL, 0, true, "C =  -30   colour = 00000000\r\n"},
-        {4294967196U, 4294967447ULL, 4095, true, "C = +120   colour = 00000000\r\n"},
+        {4294967196U, 4294967446ULL, 0, true, "C =  -40   colour = 00000100\r\n", {HIGH, HIGH, LOW}},
+        {4294967196U, 4294967447ULL, 4095, true, "C = +140   colour = 00000001\r\n", {LOW, HIGH, HIGH}},
         // Sampling itself crosses rollover; the saved timestamp is pre-sampling.
-        {4294967000U, 4294967295ULL, 1925, true, "C =  +45   colour = 00000000\r\n"},
+        {4294967000U, 4294967295ULL, 1925, true, "C =  +50   colour = 00000110\r\n", {HIGH, LOW, LOW}},
     };
     for (const auto& row : rows) {
         SCOPED_TRACE(::testing::Message() << "last=" << row.last
@@ -264,14 +266,14 @@ TEST_F(FirmwareTest, Loop) {
             }
             EXPECT_EQ(hw::microsecond_delays, std::vector<uint32_t>(16, 200));
             const std::vector<hw::PinWrite> expected_writes = {
-                {5, HIGH, row.now_ms * 1000 + 3200},
-                {6, HIGH, row.now_ms * 1000 + 3200},
-                {7, HIGH, row.now_ms * 1000 + 3200},
+                {5, row.levels[0], row.now_ms * 1000 + 3200},
+                {6, row.levels[1], row.now_ms * 1000 + 3200},
+                {7, row.levels[2], row.now_ms * 1000 + 3200},
             };
             EXPECT_EQ(hw::pin_writes, expected_writes);
-            EXPECT_EQ(hw::pin_levels[5], HIGH);
-            EXPECT_EQ(hw::pin_levels[6], HIGH);
-            EXPECT_EQ(hw::pin_levels[7], HIGH);
+            EXPECT_EQ(hw::pin_levels[5], row.levels[0]);
+            EXPECT_EQ(hw::pin_levels[6], row.levels[1]);
+            EXPECT_EQ(hw::pin_levels[7], row.levels[2]);
         } else {
             EXPECT_EQ(g_last_update_ms, row.last);
             EXPECT_EQ(hw::time_us, row.now_ms * 1000);
@@ -301,16 +303,17 @@ TEST_F(FirmwareTest, Loop) {
         size_t updates;
         bool updates_now;
         const char* cumulative_text;
+        std::array<uint8_t, 3> levels;  // Red, green, blue.
     };
     const Step steps[] = {
-        {1500000, 1500, 1, true, "C =  -30   colour = 00000000\r\n"},
-        {1503200, 1500, 1, false, "C =  -30   colour = 00000000\r\n"},
-        {1749999, 1500, 1, false, "C =  -30   colour = 00000000\r\n"},
-        {1750000, 1750, 2, true, "C =  -30   colour = 00000000\r\nC =  +45   colour = 00000000\r\n"},
-        {1753200, 1750, 2, false, "C =  -30   colour = 00000000\r\nC =  +45   colour = 00000000\r\n"},
-        {1999999, 1750, 2, false, "C =  -30   colour = 00000000\r\nC =  +45   colour = 00000000\r\n"},
-        {2000000, 2000, 3, true, "C =  -30   colour = 00000000\r\nC =  +45   colour = 00000000\r\nC = +120   colour = 00000000\r\n"},
-        {2003200, 2000, 3, false, "C =  -30   colour = 00000000\r\nC =  +45   colour = 00000000\r\nC = +120   colour = 00000000\r\n"},
+        {1500000, 1500, 1, true, "C =  -40   colour = 00000100\r\n", {HIGH, HIGH, LOW}},
+        {1503200, 1500, 1, false, "C =  -40   colour = 00000100\r\n", {HIGH, HIGH, LOW}},
+        {1749999, 1500, 1, false, "C =  -40   colour = 00000100\r\n", {HIGH, HIGH, LOW}},
+        {1750000, 1750, 2, true, "C =  -40   colour = 00000100\r\nC =  +50   colour = 00000110\r\n", {HIGH, LOW, LOW}},
+        {1753200, 1750, 2, false, "C =  -40   colour = 00000100\r\nC =  +50   colour = 00000110\r\n", {HIGH, LOW, LOW}},
+        {1999999, 1750, 2, false, "C =  -40   colour = 00000100\r\nC =  +50   colour = 00000110\r\n", {HIGH, LOW, LOW}},
+        {2000000, 2000, 3, true, "C =  -40   colour = 00000100\r\nC =  +50   colour = 00000110\r\nC = +140   colour = 00000001\r\n", {LOW, HIGH, HIGH}},
+        {2003200, 2000, 3, false, "C =  -40   colour = 00000100\r\nC =  +50   colour = 00000110\r\nC = +140   colour = 00000001\r\n", {LOW, HIGH, HIGH}},
     };
     for (const auto& step : steps) {
         SCOPED_TRACE(step.time_us);
@@ -321,9 +324,9 @@ TEST_F(FirmwareTest, Loop) {
         EXPECT_EQ(hw::analog_read_pins, std::vector<uint8_t>(step.updates * 16, 4));
         EXPECT_EQ(hw::microsecond_delays, std::vector<uint32_t>(step.updates * 16, 200));
         EXPECT_EQ(hw::pin_writes.size(), (step.updates + 1) * 3);
-        EXPECT_EQ(hw::pin_levels[5], HIGH);
-        EXPECT_EQ(hw::pin_levels[6], HIGH);
-        EXPECT_EQ(hw::pin_levels[7], HIGH);
+        EXPECT_EQ(hw::pin_levels[5], step.levels[0]);
+        EXPECT_EQ(hw::pin_levels[6], step.levels[1]);
+        EXPECT_EQ(hw::pin_levels[7], step.levels[2]);
         EXPECT_EQ(Serial.output, std::string(
             "\r\nLesson 06 homework - the colour thermometer\r\nTurn the knob.\r\n") +
             step.cumulative_text);

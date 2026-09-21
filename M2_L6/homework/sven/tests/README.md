@@ -2,6 +2,15 @@
 
 Google Test checks for `../src/main.cpp` using simulated Arduino hardware.
 
+`MapToCelsius` and `Loop` expect 0–3850 ADC counts to map to −40–+140 °C,
+with integer truncation and saturation above 3850 counts.
+
+`ColourForTemperature` and `Loop` check TODO 1's five colour bands from the
+[homework README](../../README.md#the-colour-code), including their boundaries.
+The loop checks both Serial colour bits and the common-anode LED pin levels.
+These two tests reject the original `COLOUR_OFF` stub. TODO 2's hysteresis is
+not part of these expectations.
+
 ## Run with PlatformIO
 
 From the `homework` directory:
