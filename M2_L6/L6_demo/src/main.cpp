@@ -230,7 +230,7 @@ void loop(void) {
     g_last_print_ms = now;
 
     const uint16_t counts = readPotentiometer();
-    const int16_t fahrenheit = mapToFahrenheit(counts);
+    const int16_t fahrenheit = counts;
 
     const uint16_t moved = (counts > g_last_counts)
                                ? (uint16_t)(counts - g_last_counts)
