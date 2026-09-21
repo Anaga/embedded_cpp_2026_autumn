@@ -41,8 +41,8 @@ static const uint8_t MODE_EDGE = 1U;
 static const uint8_t MODE_DEBOUNCED = 2U;
 
 // Change this in class: MODE_LEVEL, then MODE_EDGE, then MODE_DEBOUNCED.
-static const uint8_t BUTTON_MODE = MODE_LEVEL;
-//static const uint8_t BUTTON_MODE = MODE_DEBOUNCED;
+//static const uint8_t BUTTON_MODE = MODE_EDGE;
+static const uint8_t BUTTON_MODE = MODE_DEBOUNCED;
 
 // How long the pin must stay quiet before a new press is believed.
 static const uint32_t DEBOUNCE_MS = 30U;
@@ -50,7 +50,7 @@ static const uint32_t DEBOUNCE_MS = 30U;
 // The counter is printed at most this often, so the monitor stays readable.
 static const uint32_t PRINT_PERIOD_MS = 100U;
 
-static const uint8_t READING_COUNT = 5U;
+static const uint8_t READING_COUNT = 7U;
 static const uint8_t LINE_SIZE = 32U;
 
 // ---------------------------------------------------------------------------
@@ -58,12 +58,13 @@ static const uint8_t LINE_SIZE = 32U;
 // ---------------------------------------------------------------------------
 
 static void demoArrays(void) {
-    const uint8_t readings[READING_COUNT] = { 10U, 20U, 30U, 40U, 50U };
+    const uint16_t readings[READING_COUNT] = { 10U, 20U, 30U, 40U, 50U };
 
     Serial.println();
     Serial.println("--- 1. An array: many boxes, one name ---");
     Serial.printf("readings[0] = %u   (the first)\n", (unsigned)readings[0]);
-    Serial.printf("readings[4] = %u   (the last)\n", (unsigned)readings[4]);
+    Serial.printf("readings[6] = %u   (the last)\n", (unsigned)readings[6]);
+    Serial.printf("readings[7] = %u   (the wery last)\n", (unsigned)readings[7]);
     Serial.printf("sizeof(readings) = %u bytes\n", (unsigned)sizeof(readings));
 
     uint16_t sum = 0U;
