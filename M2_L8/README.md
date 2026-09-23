@@ -7,7 +7,7 @@
 - The first class: data plus the things you can do with it
 - `public` and `private`, the constructor, and why hardware waits for `begin()`
 - PWM: how a pin that can only be on or off produces any brightness
-- PWM on the ESP32-C3 with `ledcAttach()` and `ledcWrite()`
+- PWM on the ESP32-C3: channels, `ledcSetup()`, `ledcAttachPin()` and `ledcWrite()`
 - Why a class pays off: the inside changes, the calls do not
 
 ## Files

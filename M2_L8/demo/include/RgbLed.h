@@ -24,7 +24,7 @@ public:
     void off(void);
 
 private:
-    void writeChannel(uint8_t pin, uint8_t level);
+    void writeChannel(uint8_t pin, uint8_t channel, uint8_t level);
 
     uint8_t m_red;
     uint8_t m_green;

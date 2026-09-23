@@ -22,6 +22,14 @@ static const uint32_t PWM_FREQ_HZ = 5000U;
 static const uint8_t PWM_BITS = 8U;
 static const uint8_t PWM_MAX = 255U;
 
+// PWM is produced by channels, not by pins. The ESP32-C3 has six; the class
+// takes the first three and connects one pin to each. Nothing outside this
+// file ever hears about channels.
+// One RgbLed object per program: a second one would claim the same channels.
+static const uint8_t CHANNEL_RED = 0U;
+static const uint8_t CHANNEL_GREEN = 1U;
+static const uint8_t CHANNEL_BLUE = 2U;
+
 // In on/off mode a channel counts as on from half brightness upwards.
 static const uint8_t DIGITAL_THRESHOLD = 128U;
 
@@ -38,25 +46,29 @@ RgbLed::RgbLed(uint8_t red_pin, uint8_t green_pin, uint8_t blue_pin)
 /* Touch the hardware. Called from setup(), when the chip is ready. */
 void RgbLed::begin(void) {
     if (USE_PWM) {
-        ledcAttach(m_red, PWM_FREQ_HZ, PWM_BITS);
-        ledcAttach(m_green, PWM_FREQ_HZ, PWM_BITS);
-        ledcAttach(m_blue, PWM_FREQ_HZ, PWM_BITS);
+        ledcSetup(CHANNEL_RED, PWM_FREQ_HZ, PWM_BITS);
+        ledcSetup(CHANNEL_GREEN, PWM_FREQ_HZ, PWM_BITS);
+        ledcSetup(CHANNEL_BLUE, PWM_FREQ_HZ, PWM_BITS);
+
+        ledcAttachPin(m_red, CHANNEL_RED);
+        ledcAttachPin(m_green, CHANNEL_GREEN);
+        ledcAttachPin(m_blue, CHANNEL_BLUE);
     } else {
         pinMode(m_red, OUTPUT);
         pinMode(m_green, OUTPUT);
         pinMode(m_blue, OUTPUT);
     }
 
-    // A freshly attached channel starts at duty 0, and on a common anode LED
+    // A freshly set up channel starts at duty 0, and on a common anode LED
     // duty 0 is full brightness. Switch off at once, or the LED flashes white
     // every time the board starts.
     off();
 }
 
 void RgbLed::setColour(Colour c) {
-    writeChannel(m_red, c.red);
-    writeChannel(m_green, c.green);
-    writeChannel(m_blue, c.blue);
+    writeChannel(m_red, CHANNEL_RED, c.red);
+    writeChannel(m_green, CHANNEL_GREEN, c.green);
+    writeChannel(m_blue, CHANNEL_BLUE, c.blue);
 }
 
 void RgbLed::off(void) {
@@ -69,9 +81,9 @@ void RgbLed::off(void) {
 // ---------------------------------------------------------------------------
 
 /* The only place in the whole program that knows the LED is inverted. */
-void RgbLed::writeChannel(uint8_t pin, uint8_t level) {
+void RgbLed::writeChannel(uint8_t pin, uint8_t channel, uint8_t level) {
     if (USE_PWM) {
-        ledcWrite(pin, (uint32_t)(PWM_MAX - level));
+        ledcWrite(channel, (uint32_t)(PWM_MAX - level));
     } else {
         digitalWrite(pin, (level >= DIGITAL_THRESHOLD) ? LOW : HIGH);
     }
