@@ -216,15 +216,16 @@ const T = require("./slides-theme");
   T.addCode(s, [
     "static const uint32_t PWM_FREQ_HZ = 5000U;",
     "static const uint8_t PWM_BITS = 8U;",
+    "static const uint8_t CHANNEL_RED = 0U;",
     "",
-    "ledcAttach(PIN_RED, PWM_FREQ_HZ, PWM_BITS);   // once, in begin()",
-    "ledcWrite(PIN_RED, 128U);                     // any time after that",
-  ].join("\n"), T.MARGIN, T.BODY_TOP, T.CONTENT_W, 2.0, 12);
+    "ledcSetup(CHANNEL_RED, PWM_FREQ_HZ, PWM_BITS);   // once, in begin()",
+    "ledcAttachPin(PIN_RED, CHANNEL_RED);             // once, in begin()",
+    "ledcWrite(CHANNEL_RED, 128U);                    // any time after that",
+  ].join("\n"), T.MARGIN, T.BODY_TOP, T.CONTENT_W, 2.55, 12);
   T.addBullets(s, [
-    "ledcAttach replaces pinMode for that pin",
-    "ledcWrite replaces digitalWrite",
-    "analogWrite(pin, value) does the same with default settings",
-  ], T.MARGIN, 3.4, T.CONTENT_W, 1.4, 14);
+    "PWM is made by a channel, not by a pin; the chip has six of them",
+    "ledcAttachPin connects a pin to a channel; ledcWrite talks to the channel",
+  ], T.MARGIN, 3.9, T.CONTENT_W, 1.0, 14);
 
   // -------------------------------------------------------------------------
   // 14. Common anode
@@ -235,7 +236,7 @@ const T = require("./slides-theme");
     "",
     "// common anode: the pin sinks the current",
     "// 0 is full brightness, 255 is off",
-    "ledcWrite(m_red, PWM_MAX - c.red);",
+    "ledcWrite(CHANNEL_RED, PWM_MAX - c.red);",
   ].join("\n"), T.MARGIN, T.BODY_TOP, 7.0, 2.0, 12);
   T.addCallout(pres, s, "error", "The first thing that will go wrong",
     "Ask for red and get cyan, ask for black and get white. One subtraction, in one place " +
@@ -257,9 +258,9 @@ const T = require("./slides-theme");
   s = T.contentSlide(pres, "Same class, new insides", 16);
   T.addCode(s, [
     "void RgbLed::setColour(Colour c) {",
-    "    ledcWrite(m_red,   PWM_MAX - c.red);",
-    "    ledcWrite(m_green, PWM_MAX - c.green);",
-    "    ledcWrite(m_blue,  PWM_MAX - c.blue);",
+    "    ledcWrite(CHANNEL_RED,   PWM_MAX - c.red);",
+    "    ledcWrite(CHANNEL_GREEN, PWM_MAX - c.green);",
+    "    ledcWrite(CHANNEL_BLUE,  PWM_MAX - c.blue);",
     "}",
     "",
     "led.setColour(warm);    // this line never changed",
