@@ -16,7 +16,8 @@
 // Set this to false and upload: the same class now drives the LED with plain
 // digitalWrite. Eight colours instead of millions, and main.cpp does not
 // change by a single character. That is the point of the class.
-static const bool USE_PWM = true;
+static const bool USE_PWM = false;
+//static const bool USE_PWM = true;
 
 static const uint32_t PWM_FREQ_HZ = 5000U;
 static const uint8_t PWM_BITS = 8U;
