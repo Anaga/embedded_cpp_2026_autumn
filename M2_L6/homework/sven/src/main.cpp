@@ -46,6 +46,11 @@ static const uint16_t ADC_MAX_COUNTS = 3850U;
 static const int16_t C_MIN = -40;
 static const int16_t C_MAX = 140;
 
+static const int16_t C_COLD_MIN = 0;
+static const int16_t C_WARMING_MIN = 60;
+static const int16_t C_WORKING_MIN = 90;
+static const int16_t C_OVERHEATING_MIN = 110;
+
 // A colour is three bits: bit 0 red, bit 1 green, bit 2 blue.
 static const uint8_t BIT_RED = 0x01U;
 static const uint8_t BIT_GREEN = 0x02U;
@@ -109,7 +114,7 @@ static void printBinary(uint8_t value) {
 // ---------------------------------------------------------------------------
 
 /*
- * TODO 1: return the colour for this temperature.
+ * Return the colour for this temperature.
  *
  * The five bands are listed in the README. Give every boundary a name at the
  * top of the file instead of writing the number here.
@@ -117,23 +122,20 @@ static void printBinary(uint8_t value) {
  * Return one of COLOUR_BLUE, COLOUR_CYAN, COLOUR_GREEN, COLOUR_YELLOW or
  * COLOUR_RED.
  */
-static const int16_t C_FROZEN_MAX = 0;
-static const int16_t C_COLD_MAX = 60;
-static const int16_t C_WARMING_MAX = 90;
-static const int16_t C_WORKING_MAX = 110;
-
 static uint8_t colourForTemperature(int16_t celsius) {
-       if (celsius < C_FROZEN_MAX) {
+    if (celsius < C_COLD_MIN) {
         return COLOUR_BLUE;
-    } else if (celsius < C_COLD_MAX) {
-        return COLOUR_CYAN;
-    } else if (celsius < C_WARMING_MAX) {
-        return COLOUR_GREEN;
-    } else if (celsius < C_WORKING_MAX) {
-        return COLOUR_YELLOW;
-    } else {
-        return COLOUR_RED;
     }
+    if (celsius < C_WARMING_MIN) {
+        return COLOUR_CYAN;
+    }
+    if (celsius < C_WORKING_MIN) {
+        return COLOUR_GREEN;
+    }
+    if (celsius < C_OVERHEATING_MIN) {
+        return COLOUR_YELLOW;
+    }
+    return COLOUR_RED;
 }
 
 /*

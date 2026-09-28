@@ -58,6 +58,14 @@ static const uint8_t COLOUR_GREEN = BIT_GREEN;
 static const uint8_t COLOUR_CYAN = BIT_GREEN | BIT_BLUE;
 static const uint8_t COLOUR_BLUE = BIT_BLUE;
 
+static const int16_t FROZEN = 0;
+static const int16_t COLD = 60;
+static const int16_t WARM = 90;
+static const int16_t HOT = 110;
+
+static const int16_t HYSTERESIS_MARGIN = 2;
+
+
 // ---------------------------------------------------------------------------
 // STATE
 // ---------------------------------------------------------------------------
@@ -117,23 +125,31 @@ static void printBinary(uint8_t value) {
  * Return one of COLOUR_BLUE, COLOUR_CYAN, COLOUR_GREEN, COLOUR_YELLOW or
  * COLOUR_RED.
  */
-static const int16_t C_FROZEN_MAX = 0;
-static const int16_t C_COLD_MAX = 60;
-static const int16_t C_WARMING_MAX = 90;
-static const int16_t C_WORKING_MAX = 110;
-
 static uint8_t colourForTemperature(int16_t celsius) {
-       if (celsius < C_FROZEN_MAX) {
-        return COLOUR_BLUE;
-    } else if (celsius < C_COLD_MAX) {
-        return COLOUR_CYAN;
-    } else if (celsius < C_WARMING_MAX) {
-        return COLOUR_GREEN;
-    } else if (celsius < C_WORKING_MAX) {
-        return COLOUR_YELLOW;
+    static bool first_measurement = true;
+    static int16_t previous_measurement;
+    static uint8_t previous_colour;
+    uint8_t colour;
+
+    if (first_measurement || previous_measurement - celsius > HYSTERESIS_MARGIN || celsius - previous_measurement > HYSTERESIS_MARGIN) {
+        if (celsius < FROZEN) {
+            colour = COLOUR_BLUE;
+        } else if (celsius < COLD) {
+            colour = COLOUR_CYAN;
+        } else if (celsius < WARM) {
+            colour = COLOUR_GREEN;
+        } else if (celsius < HOT) {
+            colour = COLOUR_YELLOW;
+        } else {
+            colour = COLOUR_RED;
+        }
+        previous_colour = colour;
+        previous_measurement = celsius;      
     } else {
-        return COLOUR_RED;
+        colour = previous_colour;
     }
+    first_measurement = false;
+    return colour;
 }
 
 /*
