@@ -21,7 +21,7 @@ uint16_t Potentiometer::readPotentiometer(void) {
     return (uint16_t) (sum / (uint32_t) SAMPLE_COUNT);
 }
 
-uint16_t Potentiometer::readPotentiometerAsRing(void) {
+uint16_t Potentiometer::readPotentiometerInDegrees(void) {
     const uint16_t reading = readPotentiometer();
     const uint16_t clampedReading = constrain(reading, POT_MIN, POT_MAX);
     return (uint16_t) map(clampedReading, POT_MAX, POT_MIN, 0L, RING_MAX);

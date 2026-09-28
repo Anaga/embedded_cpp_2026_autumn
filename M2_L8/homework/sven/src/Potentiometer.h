@@ -11,5 +11,5 @@ public:
     Potentiometer();
     void begin(void);
     uint16_t readPotentiometer(void);
-    uint16_t readPotentiometerAsRing(void);
+    uint16_t readPotentiometerInDegrees(void);
 };

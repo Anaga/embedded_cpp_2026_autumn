@@ -15,6 +15,7 @@
 // ---------------------------------------------------------------------------
 
 static uint32_t g_last_update_ms = 0U;
+static uint16_t g_potentiometerReadingInDegrees = 0U;
 
 // ---------------------------------------------------------------------------
 // CONFIGURATION
@@ -46,9 +47,10 @@ static RgbLed led(PIN_RED, PIN_GREEN, PIN_BLUE);
 // ---------------------------------------------------------------------------
 
 /* -> reaches a field through a pointer. c->red is the same as (*c).red. */
-static void printColour(const char *label, const Colour *c) {
-    Serial.printf("  %-10s  red %3u   green %3u   blue %3u\n",
+static void printColour(const char *label, const Colour *c, uint16_t hueInDegrees) {
+    Serial.printf("  %-10s  hue %3d red %3u green %3u blue %3u\n",
                   label,
+                  hueInDegrees,
                   (unsigned) c->red,
                   (unsigned) c->green,
                   (unsigned) c->blue);
@@ -78,11 +80,11 @@ void loop(void) {
     }
     g_last_update_ms = now;
 
-    const uint16_t potentiometerReading = potentiometer.readPotentiometer();
-    Serial.printf("potentiometerReading = %+4d\n", (int) potentiometerReading);
-    const uint16_t potentiometerReadingAsRing = potentiometer.readPotentiometerAsRing();
-
-    const Colour hueColor = led.hueToColour(potentiometerReadingAsRing);
-    printColour("Hue colors: ", &hueColor);
-    led.setColour(hueColor);
+    const uint16_t potentiometerReadingInDegrees = potentiometer.readPotentiometerInDegrees();
+    if (g_potentiometerReadingInDegrees != potentiometerReadingInDegrees) {
+        const Colour hueColor = led.hueToColour(potentiometerReadingInDegrees);
+        printColour("Hue colors: ", &hueColor, potentiometerReadingInDegrees);
+        led.setColour(hueColor);
+        g_potentiometerReadingInDegrees = potentiometerReadingInDegrees;
+    }
 }
