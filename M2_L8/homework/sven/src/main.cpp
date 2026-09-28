@@ -64,6 +64,7 @@ void setup(void) {
     Serial.begin(115200);
     delay(1500U);
 
+    potentiometer.begin();
     led.begin();
 
     Serial.println();
