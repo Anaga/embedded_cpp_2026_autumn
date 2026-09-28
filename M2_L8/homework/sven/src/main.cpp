@@ -19,7 +19,14 @@
 #include <stdint.h>
 
 #include "Colour.h"
+#include "Potentiometer.h"
 #include "RgbLed.h"
+
+// ---------------------------------------------------------------------------
+// STATE
+// ---------------------------------------------------------------------------
+
+static uint32_t g_last_update_ms = 0U;
 
 // ---------------------------------------------------------------------------
 // CONFIGURATION
@@ -28,6 +35,8 @@
 static const uint8_t PIN_RED = 5U;
 static const uint8_t PIN_GREEN = 6U;
 static const uint8_t PIN_BLUE = 7U;
+
+static const uint32_t UPDATE_PERIOD_MS = 250U;
 
 static const uint32_t PALETTE_STEP_MS = 1000U;
 static const uint32_t FADE_STEP_MS = 4U;
@@ -66,6 +75,13 @@ static const NamedColour PALETTE[] = {
 };
 
 static const uint8_t PALETTE_COUNT = (uint8_t)(sizeof(PALETTE) / sizeof(PALETTE[0]));
+
+// ---------------------------------------------------------------------------
+// THE POTENTIOMETER
+// ---------------------------------------------------------------------------
+
+// Created here, before setup() runs.
+static Potentiometer potentiometer{};
 
 // ---------------------------------------------------------------------------
 // THE LED
@@ -163,29 +179,30 @@ void setup(void) {
     Serial.println();
     Serial.println("Lesson 08 - Structs, Classes and PWM");
 
-    demoStructs();
-    demoPalette();
-    demoFade();
+    // demoStructs();
+    // demoPalette();
+    // demoFade();
 
     Serial.println();
     Serial.println("--- Palette, round and round ---");
 }
 
 void loop(void) {
-    static uint32_t last_step_ms = 0U;
-    static uint8_t index = 0U;
-
+    // static uint8_t index = 0U;
     const uint32_t now = millis();
-    if ((now - last_step_ms) < PALETTE_STEP_MS) {
+    if ((now - g_last_update_ms) < UPDATE_PERIOD_MS) {
         return;
     }
-    last_step_ms = now;
+    g_last_update_ms = now;
 
-    printColour(PALETTE[index].name, &PALETTE[index].colour);
-    led.setColour(PALETTE[index].colour);
+    const uint16_t potentiometerReading = potentiometer.readPotentiometer();
+    Serial.printf("potentiometerReading = %+4d\n", (int)potentiometerReading);
 
-    index = (uint8_t)(index + 1U);
-    if (index >= PALETTE_COUNT) {
-        index = 0U;
-    }
+    // printColour(PALETTE[index].name, &PALETTE[index].colour);
+    // led.setColour(PALETTE[index].colour);
+
+    // index = (uint8_t)(index + 1U);
+    // if (index >= PALETTE_COUNT) {
+    //     index = 0U;
+    // }
 }
