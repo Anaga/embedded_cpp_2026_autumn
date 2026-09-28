@@ -22,6 +22,7 @@ public:
     void begin(void);
     void setColour(Colour c);
     void off(void);
+    Colour hueToColour(uint16_t hue);
 
 private:
     void writeChannel(uint8_t pin, uint8_t channel, uint8_t level);

@@ -5,8 +5,8 @@
 static const uint8_t SAMPLE_COUNT = 16U;
 static const uint16_t SAMPLE_GAP_US = 200U;
 static const uint8_t POT_PIN = 4U;
-static const uint16_t POT_MIN = 130U;
-static const uint16_t POT_MAX = 3480U;
+static const uint16_t POT_MIN = 250U;
+static const uint16_t POT_MAX = 3350U;
 static const uint16_t RING_MAX = 360U;
 
 Potentiometer::Potentiometer() {

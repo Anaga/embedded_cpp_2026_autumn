@@ -196,9 +196,13 @@ void loop(void) {
     g_last_update_ms = now;
 
     const uint16_t potentiometerReading = potentiometer.readPotentiometer();
-    Serial.printf("potentiometerReading = %+4d\n", (int)potentiometerReading);
+    // Serial.printf("potentiometerReading = %+4d\n", (int)potentiometerReading);
     const uint16_t potentiometerReadingAsRing = potentiometer.readPotentiometerAsRing();
     Serial.printf("potentiometerReadingAsRing = %+4d\n", (int)potentiometerReadingAsRing);
+
+    const Colour hueColor = led.hueToColour(potentiometerReadingAsRing);
+    printColour("Hue colors: ", &hueColor);
+    led.setColour(hueColor);
 
     // printColour(PALETTE[index].name, &PALETTE[index].colour);
     // led.setColour(PALETTE[index].colour);

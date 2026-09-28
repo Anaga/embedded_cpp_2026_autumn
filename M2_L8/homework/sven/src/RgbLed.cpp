@@ -62,6 +62,32 @@ void RgbLed::off(void) {
     setColour(black);
 }
 
+Colour RgbLed::hueToColour(uint16_t hue) {
+    // Secure input to max 360.
+    hue = constrain(hue, 0, 360U);
+    const uint8_t sixSlices = 60U;
+
+    const uint8_t slice = hue / sixSlices;
+    const uint8_t position = hue % sixSlices;
+    const uint8_t rising = (uint16_t) position * PWM_MAX / (sixSlices - 1);
+    const uint8_t falling = PWM_MAX - rising;
+
+    switch (slice) {
+        case 0U:
+            return {PWM_MAX, rising, 0U};
+        case 1U:
+            return {falling, PWM_MAX, 0U};
+        case 2U:
+            return {0U, PWM_MAX, rising};
+        case 3U:
+            return {0U, falling, PWM_MAX};
+        case 4U:
+            return {rising, 0U, PWM_MAX};
+        default:
+            return {PWM_MAX, 0U, falling};
+    }
+}
+
 // ---------------------------------------------------------------------------
 // PRIVATE
 // ---------------------------------------------------------------------------
