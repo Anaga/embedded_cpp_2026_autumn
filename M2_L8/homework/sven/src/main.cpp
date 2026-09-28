@@ -197,6 +197,8 @@ void loop(void) {
 
     const uint16_t potentiometerReading = potentiometer.readPotentiometer();
     Serial.printf("potentiometerReading = %+4d\n", (int)potentiometerReading);
+    const uint16_t potentiometerReadingAsRing = potentiometer.readPotentiometerAsRing();
+    Serial.printf("potentiometerReadingAsRing = %+4d\n", (int)potentiometerReadingAsRing);
 
     // printColour(PALETTE[index].name, &PALETTE[index].colour);
     // led.setColour(PALETTE[index].colour);
