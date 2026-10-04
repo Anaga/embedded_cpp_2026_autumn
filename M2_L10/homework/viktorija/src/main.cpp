@@ -43,6 +43,25 @@ static uint8_t round_number = 1U;
 static uint32_t current_state_time;
 static uint32_t pause_ms;
 
+static volatile uint32_t g_player_a_pressed_at = 0U;
+static volatile bool g_player_a_pressed = false;
+static volatile uint32_t g_player_b_pressed_at = 0U;
+static volatile bool g_player_b_pressed = false;
+static uint32_t g_go_at = 0;
+
+static void IRAM_ATTR onButtonA(void) {
+    if (!g_player_a_pressed) {
+        g_player_a_pressed_at = micros();
+        g_player_a_pressed = true;
+    }
+}
+static void IRAM_ATTR onButtonB(void) {
+    if (!g_player_b_pressed) {
+        g_player_b_pressed_at = micros();
+        g_player_b_pressed = true;
+    }
+}
+
 static const uint8_t WINNER_SCORE = 5U;
 static Colour winner_colour;
 
@@ -129,19 +148,22 @@ void setup(void) {
     led.off();
 
     player1.begin();
-    player2.begin();
+    attachInterrupt(digitalPinToInterrupt(PLAYER_A_BUTTON_PIN), onButtonA, FALLING);
 
-    pause_ms = (uint32_t)random(STATE_WAIT_DURATION_MIN, STATE_WAIT_DURATION_MAX);
-    current_state_time = millis();
+    player2.begin();
+    attachInterrupt(digitalPinToInterrupt(PLAYER_B_BUTTON_PIN), onButtonB, FALLING);
     
     Serial.printf("\n=====================================================================\n");
     Serial.printf("STARTING THE GAME \n");
     Serial.printf("=====================================================================\n\n");
     Serial.printf("Round %u - get ready... Press on green light!\n", (unsigned)round_number);
-
+    
+    pause_ms = (uint32_t)random(STATE_WAIT_DURATION_MIN, STATE_WAIT_DURATION_MAX);
+    current_state_time = millis();
 }
 
 void loop(void) {
+
     const bool player_a_pressed = player1.wasPressed();
     const bool player_b_pressed = player2.wasPressed();
 
@@ -152,53 +174,58 @@ void loop(void) {
             led.setColour(WHITE);
             current_state = State::Result;
             current_state_time = millis();
+            g_player_a_pressed = false;
+            g_player_b_pressed = false;
             Serial.println("Double false start");
         } else if (player_a_pressed) {
             led.setColour(BLUE);
             current_state = State::Result;
             current_state_time = millis();
             addPoint(player_b_score);
+            g_player_a_pressed = false;
+            g_player_b_pressed = false;
             Serial.printf("                                                False start. BLUE wins! %u pts\n", (unsigned)player_b_score);
         } else if (player_b_pressed) {
             led.setColour(RED);
             current_state = State::Result;
             current_state_time = millis();
             addPoint(player_a_score);
+            g_player_a_pressed = false;
+            g_player_b_pressed = false;
             Serial.printf("                  False start. RED wins! %u pts\n", (unsigned)player_a_score);
         } else if ((millis() - current_state_time) >= pause_ms) {
             led.setColour(GREEN);
+            g_go_at = micros();
+            g_player_a_pressed = false;
+            g_player_b_pressed = false;
             current_state = State::Go;
             current_state_time = millis();
             Serial.println("GO!");
         }
         break;
     case State::Go: {
-        const uint16_t reaction_time = (uint16_t) (millis() - current_state_time);
-        if (player_a_pressed && player_b_pressed) {
-            led.setColour(WHITE);
-            player_a_history.push(reaction_time);
-            player_b_history.push(reaction_time);
-            current_state = State::Result;
-            current_state_time = millis();
-            Serial.println("DRAW");
-            printHistory("RED", player_a_history);
-            printHistory("BLUE", player_b_history);
-        } else if (player_a_pressed) {
+        const bool a_wins = player_a_pressed && (!player_b_pressed || g_player_a_pressed_at <= g_player_b_pressed_at);
+        const bool b_wins = player_b_pressed && !a_wins;
+        if (a_wins) {
+            const uint32_t reaction_us = g_player_a_pressed_at - g_go_at;
+            const uint32_t tenths = reaction_us / 100U;
             led.setColour(RED);
-            player_a_history.push(reaction_time);
+            player_a_history.push((uint16_t)(reaction_us / 1000U));
             current_state = State::Result;
             current_state_time = millis();
             addPoint(player_a_score);
-            Serial.printf("                  RED wins! %u ms, %u pts\n", (unsigned)reaction_time, (unsigned)player_a_score);
+            Serial.printf("                  RED wins! %u.%u ms, %u pts\n", (unsigned)(tenths / 10U), (unsigned) (tenths % 10U), (unsigned)player_a_score);
             Serial.printf("                  ");
             printHistory("RED", player_a_history);
-        } else if (player_b_pressed) {
+        } else if (b_wins) {
+            const uint32_t reaction_us = g_player_b_pressed_at - g_go_at;
+            const uint32_t tenths = reaction_us / 100U;
             led.setColour(BLUE);
-            player_b_history.push(reaction_time);
+            player_b_history.push((uint16_t)(reaction_us / 1000U));
             current_state = State::Result;
             current_state_time = millis();
             addPoint(player_b_score);
-            Serial.printf("                                                BLUE wins! %u ms, %u pts\n", (unsigned)reaction_time, (unsigned)player_b_score);
+            Serial.printf("                                                BLUE wins! %u.%u ms, %u pts\n", (unsigned)(tenths / 10U), (unsigned) (tenths % 10U), (unsigned)player_b_score);
             Serial.printf("                                                ");
             printHistory("BLUE", player_b_history);
         }
