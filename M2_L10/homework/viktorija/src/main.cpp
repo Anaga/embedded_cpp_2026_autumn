@@ -39,6 +39,9 @@ static const uint32_t STATE_CELEBRATE_DURATION = 5000U;
 static const uint32_t STATE_WAIT_DURATION_MIN = 1000U;
 static const uint32_t STATE_WAIT_DURATION_MAX = 3001U;
 
+static const uint8_t WINNER_SCORE = 5U;
+static Colour winner_colour;
+
 static uint8_t round_number = 1U;
 static uint32_t current_state_time;
 static uint32_t pause_ms;
@@ -53,17 +56,14 @@ static void IRAM_ATTR onButtonA(void) {
     if (!g_player_a_pressed) {
         g_player_a_pressed_at = micros();
         g_player_a_pressed = true;
-    }
-}
+    }    
+}    
 static void IRAM_ATTR onButtonB(void) {
     if (!g_player_b_pressed) {
         g_player_b_pressed_at = micros();
         g_player_b_pressed = true;
-    }
-}
-
-static const uint8_t WINNER_SCORE = 5U;
-static Colour winner_colour;
+    }    
+}    
 
 enum class State : uint8_t {
     Waiting,
@@ -73,6 +73,11 @@ enum class State : uint8_t {
 };
 
 static State current_state = State::Waiting;
+
+static void enterState(State next) {
+    current_state = next;
+    current_state_time = millis();
+}
 
 static void addPoint(uint8_t &score) {
     score = (uint8_t)(score + 1U);
@@ -115,7 +120,6 @@ static void printHistory(const char *name, const RingBuffer<uint16_t, 10> &histo
         Serial.printf(" %u", (unsigned) history.at(i));
     }
     Serial.printf(")\n");
-
 }
 
 static void celebrate(const char *name, const Colour &colour) {
@@ -137,12 +141,7 @@ static void celebrate(const char *name, const Colour &colour) {
 
 void setup(void) {
     Serial.begin(115200);
-    //delay(4000U);
-    // when monitoring, using the below while instead of above delay in order
-    // to see the first printouts which get cut off when reflashing if using delay
-    while (!Serial && millis() < 5000U) {
-    }
-
+    delay(4000U);
 
     led.begin();
     led.off();
@@ -172,34 +171,24 @@ void loop(void) {
     case State::Waiting:
         if (player_a_pressed && player_b_pressed) {
             led.setColour(WHITE);
-            current_state = State::Result;
-            current_state_time = millis();
-            g_player_a_pressed = false;
-            g_player_b_pressed = false;
+            enterState(State::Result);
             Serial.println("Double false start");
         } else if (player_a_pressed) {
             led.setColour(BLUE);
-            current_state = State::Result;
-            current_state_time = millis();
+            enterState(State::Result);
             addPoint(player_b_score);
-            g_player_a_pressed = false;
-            g_player_b_pressed = false;
             Serial.printf("                                                False start. BLUE wins! %u pts\n", (unsigned)player_b_score);
         } else if (player_b_pressed) {
             led.setColour(RED);
-            current_state = State::Result;
-            current_state_time = millis();
+            enterState(State::Result);
             addPoint(player_a_score);
-            g_player_a_pressed = false;
-            g_player_b_pressed = false;
             Serial.printf("                  False start. RED wins! %u pts\n", (unsigned)player_a_score);
         } else if ((millis() - current_state_time) >= pause_ms) {
             led.setColour(GREEN);
             g_go_at = micros();
             g_player_a_pressed = false;
             g_player_b_pressed = false;
-            current_state = State::Go;
-            current_state_time = millis();
+            enterState(State::Go);
             Serial.println("GO!");
         }
         break;
@@ -211,8 +200,7 @@ void loop(void) {
             const uint32_t tenths = reaction_us / 100U;
             led.setColour(RED);
             player_a_history.push((uint16_t)(reaction_us / 1000U));
-            current_state = State::Result;
-            current_state_time = millis();
+            enterState(State::Result);
             addPoint(player_a_score);
             Serial.printf("                  RED wins! %u.%u ms, %u pts\n", (unsigned)(tenths / 10U), (unsigned) (tenths % 10U), (unsigned)player_a_score);
             Serial.printf("                  ");
@@ -222,8 +210,7 @@ void loop(void) {
             const uint32_t tenths = reaction_us / 100U;
             led.setColour(BLUE);
             player_b_history.push((uint16_t)(reaction_us / 1000U));
-            current_state = State::Result;
-            current_state_time = millis();
+            enterState(State::Result);
             addPoint(player_b_score);
             Serial.printf("                                                BLUE wins! %u.%u ms, %u pts\n", (unsigned)(tenths / 10U), (unsigned) (tenths % 10U), (unsigned)player_b_score);
             Serial.printf("                                                ");
@@ -236,19 +223,18 @@ void loop(void) {
             if (player_a_score >= WINNER_SCORE) {
                 celebrate("RED", RED);
                 winner_colour = RED;
-                current_state = State::Celebrate;
+                enterState(State::Celebrate);
             } else if (player_b_score >= WINNER_SCORE) {
                 celebrate("BLUE", BLUE);
                 winner_colour = BLUE;
-                current_state = State::Celebrate;
+                enterState(State::Celebrate);
             } else {
                 led.off();
-                current_state = State::Waiting;
+                enterState(State::Waiting);
                 round_number++;
                 pause_ms = (uint32_t)random(STATE_WAIT_DURATION_MIN, STATE_WAIT_DURATION_MAX);
                 Serial.printf("\nRound %u: wait... \n", (unsigned)round_number);
             }
-            current_state_time = millis();
         }
         break;
     case State::Celebrate: {
@@ -260,8 +246,7 @@ void loop(void) {
         }
         if ((millis() - current_state_time) >= STATE_CELEBRATE_DURATION || player_a_pressed || player_b_pressed) {
             led.off();
-            current_state = State::Waiting;
-            current_state_time = millis();
+            enterState(State::Waiting);
             round_number++;
             pause_ms = (uint32_t)random(STATE_WAIT_DURATION_MIN, STATE_WAIT_DURATION_MAX);
             Serial.printf("\n=====================================================================\n");
