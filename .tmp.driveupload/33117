@@ -1,0 +1,10 @@
+; Lesson 11 - Hardware timer demo
+; ESP32-C3 Super Mini, Arduino framework (PlatformIO ships Arduino-ESP32 core 2.x)
+
+[env:esp32c3]
+platform = espressif32
+board = lolin_c3_mini
+framework = arduino
+monitor_speed = 115200
+build_unflags = -std=gnu++11
+build_flags = -std=gnu++17

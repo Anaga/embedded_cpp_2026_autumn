@@ -1,0 +1,23 @@
+0000000000000000000000000000000000000000 a50a67a337463c564077fb9f230d69ff21a20526 Vahur Värik <vahurv@Vahurs-Laptop.local> 1789579210 +0300	clone: from https://github.com/Anaga/embedded_cpp_2026_autumn.git
+a50a67a337463c564077fb9f230d69ff21a20526 9e89b8cf2efce277f6bb42e5ce5c372d6808588b vahurvarik <vahurvarik@gmail.com> 1789579502 +0300	checkout: moving from main to feature/m1_l4/homework_sven
+9e89b8cf2efce277f6bb42e5ce5c372d6808588b a50a67a337463c564077fb9f230d69ff21a20526 vahurvarik <vahurvarik@gmail.com> 1789579506 +0300	checkout: moving from feature/m1_l4/homework_sven to main
+a50a67a337463c564077fb9f230d69ff21a20526 99f3b38131e928d01a35e56b004d125e9e24c108 vahurvarik <vahurvarik@gmail.com> 1789745035 +0300	pull --ff --recurse-submodules --progress origin: Fast-forward
+99f3b38131e928d01a35e56b004d125e9e24c108 367056ad4d1c5c0c1b2fe29a1638c2ab88d1d62d vahurvarik <vahurvarik@gmail.com> 1789749496 +0300	commit: Create vahur.md
+367056ad4d1c5c0c1b2fe29a1638c2ab88d1d62d c37b3ee4c5f5c8fb8d410bededfb5e30ab88785c vahurvarik <vahurvarik@gmail.com> 1789749565 +0300	commit: Update vahur.md
+c37b3ee4c5f5c8fb8d410bededfb5e30ab88785c 0a68875e25eec71970f61afc530698f875bdd97a vahurvarik <vahurvarik@gmail.com> 1789749611 +0300	commit: Update vahur.md
+0a68875e25eec71970f61afc530698f875bdd97a da244abf58ef5af0deebe41421baae79fca4f7a2 vahurvarik <vahurvarik@gmail.com> 1790001017 +0300	pull --ff --recurse-submodules --progress origin: Fast-forward
+da244abf58ef5af0deebe41421baae79fca4f7a2 fe88c47cc7dfd64acb10fd4a891472bbce810b39 vahurvarik <vahurvarik@gmail.com> 1790001836 +0300	commit: L6 homework
+fe88c47cc7dfd64acb10fd4a891472bbce810b39 3f6b6a3df258e22fc3e4302451455abef1c09015 vahurvarik <vahurvarik@gmail.com> 1790149096 +0300	pull --ff --recurse-submodules --progress origin: Fast-forward
+3f6b6a3df258e22fc3e4302451455abef1c09015 00c5965877207b560f1b727b61690157e95c9243 vahurvarik <vahurvarik@gmail.com> 1790179880 +0300	pull --ff --recurse-submodules --progress origin: Fast-forward
+00c5965877207b560f1b727b61690157e95c9243 88e9810353404fa6420bfe010ff81dbea38bca3a vahurvarik <vahurvarik@gmail.com> 1790600973 +0300	commit: L8 homework
+88e9810353404fa6420bfe010ff81dbea38bca3a a5befa2aa9edb3cfd773502fb457a8782cf0fa35 vahurvarik <vahurvarik@gmail.com> 1790601611 +0300	commit: L8
+a5befa2aa9edb3cfd773502fb457a8782cf0fa35 6cc8f590d314a7ed0787e7f0bcb41a15cf72e231 vahurvarik <vahurvarik@gmail.com> 1790602129 +0300	commit: L8
+6cc8f590d314a7ed0787e7f0bcb41a15cf72e231 98b5f3494591e647b1ea83eccf0bd293e064c45c vahurvarik <vahurvarik@gmail.com> 1790602670 +0300	commit: L8
+98b5f3494591e647b1ea83eccf0bd293e064c45c dfd1998ab705c281f4c8999b9e62c76891b73224 vahurvarik <vahurvarik@gmail.com> 1790609783 +0300	pull --ff --recurse-submodules --progress origin: Fast-forward
+dfd1998ab705c281f4c8999b9e62c76891b73224 95b669c475d35a91e1e88cc82b84f17659e80f71 vahurvarik <vahurvarik@gmail.com> 1790928031 +0300	pull --ff --recurse-submodules --progress origin: Fast-forward
+95b669c475d35a91e1e88cc82b84f17659e80f71 d21c45b44791e0b91502a136ce35d682e97903b7 vahurvarik <vahurvarik@gmail.com> 1790949935 +0300	commit: Add Vahur homework button debounce
+d21c45b44791e0b91502a136ce35d682e97903b7 44f364805d185f3582abafb547a1bb4eb79b1d5b vahurvarik <vahurvarik@gmail.com> 1790950958 +0300	commit: L9
+44f364805d185f3582abafb547a1bb4eb79b1d5b 44f364805d185f3582abafb547a1bb4eb79b1d5b vahurvarik <vahurvarik@gmail.com> 1790956451 +0300	reset: moving to HEAD
+44f364805d185f3582abafb547a1bb4eb79b1d5b b19a9b32c378f9de5ce1a40de8d0c4fa57b42d00 vahurvarik <vahurvarik@gmail.com> 1790956545 +0300	commit (merge): Merge branch 'main' of https://github.com/Anaga/embedded_cpp_2026_autumn
+b19a9b32c378f9de5ce1a40de8d0c4fa57b42d00 fe9343528b772919176b06597a6828189ac92bbd vahurvarik <vahurvarik@gmail.com> 1791210589 +0300	commit: M2_L9 homework continues
+fe9343528b772919176b06597a6828189ac92bbd 621b86d353a58cd9eecd03e7489001195107de13 vahurvarik <vahurvarik@gmail.com> 1791210598 +0300	pull --ff --recurse-submodules --progress origin: Merge made by the 'ort' strategy.
