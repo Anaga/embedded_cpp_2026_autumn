@@ -227,3 +227,46 @@ will not use.
   assumed as prior knowledge.
 - GitHub Classroom is dropped in favour of a public repository with students as
   contributors - which is what actually happened last time.
+
+STATE AFTER K3 (sessions 5-10 delivered, K3 closed 2026-10-02 on schedule)
+
+Package format (since lesson 07, at the students' request):
+- slides/ (generator .js + .pptx), demo/ (+ demo/README.md),
+  homework/README.md as the full task spec, homework/platformio.ini,
+  short lesson README.md pointing to both. No scaffold, no solution.
+- homework/platformio.ini: [platformio] block with one src_dir line per
+  student (sven, viktorija, anton, vahur), placed BEFORE [env:...] so the
+  build_flags stay in the env section. Students keep headers in their own
+  <name>/src folder, not in the shared include/.
+
+Toolchain fact: PlatformIO platform = espressif32 ships Arduino-ESP32
+core 2.x, not 3.x. PWM uses channels: ledcSetup / ledcAttachPin /
+ledcWrite(channel, duty). ledcAttach does not exist here.
+
+Hardware as actually wired:
+- Button A GPIO 0, Button B GPIO 1, both INPUT_PULLUP, to GND
+- RGB LED 500RGB4E, common anode to 3V3, R/G/B on GPIO 5/6/7,
+  100 ohm on every channel (measured: all three look right)
+- Potentiometer 10k on GPIO 4 (ADC1), 3.3k in series to 3V3;
+  without it the ADC clips at about 2.9 V (measured max ~3850 counts)
+
+What the students already have and can use:
+- struct Colour, class RgbLed (PWM and common-anode inversion inside,
+  begin/off, setColour(const Colour&) and setColour(r,g,b))
+- class Button (debounced: a press counts only after 30 ms of quiet)
+- template RingBuffer<T, N> (no heap), moving average
+- state machines with enum class + switch, no delay() in loops
+- interrupts touched once: attachInterrupt, IRAM_ATTR, volatile
+
+Consequence for K4: PWM, ADC basics, button debounce and first
+interrupts are already done. K4 needs re-planning around what is left:
+hardware timers, ISR discipline and critical sections, UART, I2C
+(OPT4001), SPI (Nokia 5110), then session 14 logic analyzer.
+
+Deferred into K4 on purpose:
+- RAII -> the SPI lesson, as a chip-select guard class
+- critical sections -> reading ISR-shared data safely
+
+Cohort: 4 students, 1 with prior programming (Java). Pace accordingly.
+Slide environment resets between days: copy slides-theme.js and
+npm install pptxgenjs react react-dom react-icons sharp before building.
