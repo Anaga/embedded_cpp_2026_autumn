@@ -1,3 +1,0 @@
-.pio/build/lolin_c3_mini/FrameworkArduino/cbuf.cpp.o: \
- /Users/vahurv/.platformio/packages/framework-arduinoespressif32/cores/esp32/cbuf.cpp \
- /Users/vahurv/.platformio/packages/framework-arduinoespressif32/cores/esp32/cbuf.h
