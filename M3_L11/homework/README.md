@@ -65,14 +65,30 @@ hotspot, and let it finish. Later builds are fast.
 1. Hold the **BOOTSEL** button on the Pico.
 2. While holding it, plug the USB cable into the computer.
 3. Release the button. A drive called `RPI-RP2` appears.
-4. Upload from PlatformIO.
+4. **Windows only, once per computer:** PlatformIO uploads with a tool
+   called picotool, and on Windows picotool needs a driver for the Pico's boot
+   interface. Without it the upload stops with "picotool was unable to
+   connect. You may need to install a driver via Zadig". With the board still
+   in BOOTSEL mode:
+   - Download Zadig from https://zadig.akeo.ie and run it.
+   - In the device list choose **RP2 Boot (Interface 1)**. If it is not in
+     the list, enable Options -> List All Devices.
+   - Choose **WinUSB** as the driver and click Install Driver. It can take a
+     few minutes.
+   - Do **not** change the driver of Interface 0 - that one is the
+     `RPI-RP2` drive.
+
+   This is the same Zadig we will use for the logic analyzer later in the
+   course.
+5. Upload from PlatformIO.
 
 After this first time you do not need BOOTSEL any more: PlatformIO resets the
 board through its USB serial port before each upload.
 
-**If the upload fails:** put the board into BOOTSEL mode again (steps 1-3),
-then copy `.pio/build/pico/firmware.uf2` onto the `RPI-RP2` drive by hand. The
-board restarts and runs your program. Write down that you needed this.
+**If the upload still fails:** put the board into BOOTSEL mode again (steps
+1-3), then copy `.pio/build/pico/firmware.uf2` onto the `RPI-RP2` drive by
+hand. The board restarts and runs your program. Write down that you needed
+this.
 
 ## The task
 
