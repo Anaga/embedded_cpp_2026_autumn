@@ -318,12 +318,12 @@ will not use.
    1 / 2, GND pin 3); I2C0 GP4 SDA / GP5 SCL (6 / 7); SPI0 GP16 MISO / GP17 CS
    / GP18 SCK / GP19 MOSI (21 / 22 / 24 / 25); Nokia D/C GP20, RST GP21
    (26 / 27); RGB GP10 / 11 / 12 (14 / 15 / 16); buttons GP14 / GP15
-   (19 / 20); potentiometer GP26 = ADC0 (31); on-board LED GP25. Still to be
-   copied into course-conventions.md.
+   (19 / 20); potentiometer GP26 = ADC0 (31); on-board LED GP25. Copied into
+   course-conventions.md 2026-10-07.
 6. **Pico hardware before session 12.** Confirm the four boards, 8 x 20-pin
    male headers, and buy 1-2 spare boards: one for the instructor demo, one
-   to replace a board that dies in class. course-conventions.md needs the
-   Pico added to the inventory and toolchain sections.
+   to replace a board that dies in class. Pico inventory and toolchain notes
+   added to course-conventions.md 2026-10-07.
 
 ---
 
