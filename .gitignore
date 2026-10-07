@@ -78,3 +78,6 @@ cmake-build-*/
 
 # VSCode staff
 *.vscode/
+
+# Temporary folder created by editors
+.tmp.driveupload/
