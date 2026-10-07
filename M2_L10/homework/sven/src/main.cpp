@@ -1,5 +1,5 @@
 /*
- * Lesson 09 - homework by sven. See README.md for requirements.
+ * Lesson 10 - homework by sven. See README.md for requirements.
  */
 
 #include <Arduino.h>
