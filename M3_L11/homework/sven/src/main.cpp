@@ -20,7 +20,7 @@ void setup() {
 
     // Print cpu clock.
     uint32_t startupCpuFrequencyHz = rp2040.f_cpu();
-    Serial.printf("CPU clock: %lu Hz\r\n", static_cast<unsigned long>(startupCpuFrequencyHz));
+    Serial.printf("CPU clock: %lu Hz\r\n", startupCpuFrequencyHz);
 
     lastBlinkMs = millis();
     lastReportMs = lastBlinkMs;
@@ -38,6 +38,6 @@ void loop() {
 
     if (nowMs - lastReportMs >= REPORT_INTERVAL_MS) {
         lastReportMs = nowMs;
-        Serial.printf("Pico alive, uptime %lu s\r\n", static_cast<unsigned long>(nowMs / MS_PER_SECOND));
+        Serial.printf("Pico alive, uptime %lu s\r\n", (nowMs / MS_PER_SECOND));
     }
 }
