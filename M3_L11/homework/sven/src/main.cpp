@@ -10,10 +10,14 @@ static const uint32_t MS_PER_SECOND = 1000U;
 
 static uint32_t lastBlinkMs = 0U;
 static uint32_t lastReportMs = 0U;
+static uint32_t startupCpuFrequencyHz = 0U;
 static bool ledOn = true;
+static bool cpuFrequencyPrinted = false;
 
 void setup() {
     Serial.begin(SERIAL_BAUD);
+    delay(1500U);
+    startupCpuFrequencyHz = rp2040.f_cpu();
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, HIGH);
 
@@ -29,6 +33,14 @@ void loop() {
         lastBlinkMs = nowMs;
         ledOn = !ledOn;
         digitalWrite(LED_PIN, ledOn ? HIGH : LOW);
+    }
+
+    // Print startup information once USB serial connects, without waiting for it.
+    if (!cpuFrequencyPrinted && Serial) {
+        Serial.print("CPU clock: ");
+        Serial.print(startupCpuFrequencyHz);
+        Serial.println(" Hz");
+        cpuFrequencyPrinted = true;
     }
 
     if (nowMs - lastReportMs >= REPORT_INTERVAL_MS) {
