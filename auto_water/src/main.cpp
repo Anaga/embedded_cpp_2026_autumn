@@ -41,6 +41,7 @@ static const uint8_t  TICK_TIMER = 0U;  // general purpose timer 0 of 2
 // Watering.
 static const uint32_t WATER_INTERVAL_MIN = 60U;    // start to start
 static const bool     WATER_ON_BOOT      = true;   // first watering right after power-on
+static const uint32_t WATER_SEC          = 300U;   // fixed length for now (5 min)
 static const uint32_t WATER_MIN_SEC      = 60U;    // knob at the low end
 static const uint32_t WATER_MAX_SEC      = 360U;   // knob at the high end
 static const uint32_t WATER_STEP_SEC     = 10U;    // knob resolution
@@ -114,6 +115,8 @@ static_assert(PUMP_HARD_LIMIT_SEC > (WATER_MAX_SEC + (PUMP_RAMP_MS / 1000U) + 1U
               "hard limit must exceed the longest normal watering");
 static_assert((WATER_INTERVAL_MIN * 60U) > PUMP_HARD_LIMIT_SEC,
               "interval must be longer than any watering");
+static_assert((WATER_SEC >= WATER_MIN_SEC) && (WATER_SEC <= WATER_MAX_SEC),
+              "WATER_SEC outside the watering range");
 static_assert(PUMP_DUTY_PERCENT <= 100U, "pump duty above 100 percent");
 
 static_assert(LIGHT_MAX_PERCENT <= 100U, "brightness above 100 percent");
@@ -125,25 +128,31 @@ static_assert(POT_MV_LOW < POT_MV_HIGH, "pot range reversed - use POT_REVERSED i
 
 
 // ---------------------------------------------------------------------------
-// Step 2: both PWM outputs follow the knob (0..100 percent).
-// Next steps: time base, pump, light, status LED, commands.
+// Step 3: the pump runs WATER_SEC every WATER_INTERVAL_MIN. The light stays off.
+// Next steps: knob sets the length, light, status LED, commands.
 // ---------------------------------------------------------------------------
 
-static uint16_t samples[SMOOTH_SAMPLES];
-static uint8_t  sampleIdx = 0U;
-static uint32_t sampleSum = 0U;
-
-// Knob position in percent, 0..100, from the averaged millivolts.
-static uint32_t potPercent(uint32_t mv) {
-    if (mv <= POT_MV_LOW)  { mv = POT_MV_LOW; }
-    if (mv >= POT_MV_HIGH) { mv = POT_MV_HIGH; }
-    uint32_t pct = ((mv - POT_MV_LOW) * 100U + (POT_MV_HIGH - POT_MV_LOW) / 2U)
-                   / (POT_MV_HIGH - POT_MV_LOW);
-    return POT_REVERSED ? (100U - pct) : pct;
-}
+static bool     pumpOn      = false;
+static bool     pumpFault   = false;
+static uint32_t pumpStartMs = 0U;   // when the current watering began
+static uint32_t lastWaterMs = 0U;   // start of the last watering, for the schedule
 
 static void setPwmPercent(uint8_t channel, uint32_t percent) {
     ledcWrite(channel, (percent * PWM_MAX + 50U) / 100U);
+}
+
+static void pumpStart(uint32_t now) {
+    pumpOn = true;
+    pumpStartMs = now;
+    lastWaterMs = now;
+    Serial.printf("[%lu s] pump on for %lu s\n",
+                  (unsigned long)(now / 1000U), (unsigned long)WATER_SEC);
+}
+
+static void pumpStop(uint32_t now) {
+    pumpOn = false;
+    setPwmPercent(CH_PUMP, 0U);
+    Serial.printf("[%lu s] pump off\n",(unsigned long)(now / 1000U));
 }
 
 void setup() {
@@ -158,15 +167,6 @@ void setup() {
     Serial.begin(SERIAL_BAUD);
     delay(SERIAL_WAIT_MS);
 
-    analogSetPinAttenuation(PIN_POT, ADC_11db);  // 11 dB is the "12 dB" range on the C3
-
-    // Prefill the average so the first output is not dragged toward zero.
-    uint32_t mv = analogReadMilliVolts(PIN_POT);
-    for (uint8_t i = 0U; i < SMOOTH_SAMPLES; i++) {
-        samples[i] = (uint16_t)mv;
-    }
-    sampleSum = mv * SMOOTH_SAMPLES;
-
     ledcSetup(CH_PUMP, PUMP_PWM_HZ, PWM_BITS);
     ledcAttachPin(PIN_PUMP, CH_PUMP);
     ledcSetup(CH_LIGHT, LIGHT_PWM_HZ, PWM_BITS);
@@ -174,13 +174,17 @@ void setup() {
     ledcWrite(CH_PUMP, 0U);
     ledcWrite(CH_LIGHT, 0U);
 
-    Serial.println("Taimer - step 2: PWM A and PWM B follow the knob");
+    Serial.println("Taimer - step 3: pump on a timer, light off");
+
+    uint32_t now = millis();
+    lastWaterMs = now;
+    if (WATER_ON_BOOT) {
+        pumpStart(now);
+    }
 }
 
 void loop() {
     static uint32_t lastTick = 0U;
-    static uint32_t lastPct = 101U;  // forces the first print
-    static uint32_t lastPrint = 0U;
 
     uint32_t now = millis();
     if ((now - lastTick) < TICK_MS) {
@@ -188,23 +192,31 @@ void loop() {
     }
     lastTick = now;
 
-    // One sample per tick, moving average.
-    uint32_t mv = analogReadMilliVolts(PIN_POT);
-    sampleSum -= samples[sampleIdx];
-    samples[sampleIdx] = (uint16_t)mv;
-    sampleSum += mv;
-    sampleIdx = (uint8_t)((sampleIdx + 1U) % SMOOTH_SAMPLES);
+    if (pumpFault) {
+        return;  // output already off, stays off until reset
+    }
 
-    uint32_t avgMv = sampleSum / SMOOTH_SAMPLES;
-    uint32_t pct = potPercent(avgMv);
+    // Unsigned subtraction keeps this right across the 49-day millis() wrap.
+    if (pumpOn) {
+        uint32_t onMs = now - pumpStartMs;
 
-    setPwmPercent(CH_PUMP, pct);
-    setPwmPercent(CH_LIGHT, pct);
-
-    if ((pct != lastPct) && ((now - lastPrint) >= POT_PRINT_PERIOD_MS)) {
-        lastPct = pct;
-        lastPrint = now;
-        Serial.printf("knob %lu mV -> PWM A and B %lu%%\n",
-                      (unsigned long)avgMv, (unsigned long)pct);
+        if (onMs >= (PUMP_HARD_LIMIT_SEC * 1000U)) {
+            pumpFault = true;
+            pumpStop(now);
+            Serial.println("FAULT: pump on too long, off until reset");
+            return;
+        }
+        if (onMs >= (WATER_SEC * 1000U)) {
+            pumpStop(now);
+            return;
+        }
+        // Soft start, then full duty.
+        uint32_t duty = PUMP_DUTY_PERCENT;
+        if (onMs < PUMP_RAMP_MS) {
+            duty = (PUMP_DUTY_PERCENT * onMs) / PUMP_RAMP_MS;
+        }
+        setPwmPercent(CH_PUMP, duty);
+    } else if ((now - lastWaterMs) >= (WATER_INTERVAL_MIN * 60000U)) {
+        pumpStart(now);
     }
 }
