@@ -1,10 +1,12 @@
 /*
- * Game.h - round state and scores for the two-player reaction game.
+ * Game.h - round state, scores and histories for the two-player reaction game.
  */
 
 #pragma once
 
 #include <stdint.h>
+
+#include "RingBuffer.h"
 
 class Button;
 class RgbLed;
@@ -45,4 +47,6 @@ private:
     uint32_t m_round;
     uint32_t m_player1_score;
     uint32_t m_player2_score;
+    RingBuffer<uint16_t, 10> m_player1_history;
+    RingBuffer<uint16_t, 10> m_player2_history;
 };

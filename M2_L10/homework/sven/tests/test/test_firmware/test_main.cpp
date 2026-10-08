@@ -326,7 +326,10 @@ TEST_F(FirmwareTest, GameConstructor) {
     press(2U);
     fake_arduino::now_ms = 2331U;
     game.update();
-    EXPECT_EQ(Serial.output, "GO!\nPlayer 2 wins in 231 ms\nScore: player 1 - 0, player 2 - 1\n\n");
+    EXPECT_EQ(Serial.output,
+              "GO!\nPlayer 2 wins in 231 ms\nScore: player 1 - 0, player 2 - 1\n\n"
+              "Player 1   last 0: -   best -   avg -\n"
+              "Player 2   last 1: 231   best 231   avg 231\n\n");
 }
 
 TEST_F(FirmwareTest, GameBegin) {
@@ -369,14 +372,20 @@ TEST_F(FirmwareTest, GameStartRound) {
 }
 
 TEST_F(FirmwareTest, GameFinishRound) {
-    struct Row { bool ready; uint8_t pressed; const char *text; Colour colour; };
+    struct Row { bool ready; uint8_t pressed; const char *text; Colour colour; const char *histories; };
     const Row rows[] = {
-        {false, 1, "False start by player 1\nPlayer 2 wins\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255}},
-        {false, 2, "False start by player 2\nPlayer 1 wins\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0}},
-        {false, 3, "Draw\nScore: player 1 - 0, player 2 - 0\n\n", {255, 255, 255}},
-        {true, 1, "Player 1 wins in 231 ms\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0}},
-        {true, 2, "Player 2 wins in 231 ms\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255}},
-        {true, 3, "Draw\nScore: player 1 - 0, player 2 - 0\n\n", {255, 255, 255}}
+        {false, 1, "False start by player 1\nPlayer 2 wins\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255},
+         "Player 1   last 0: -   best -   avg -\nPlayer 2   last 0: -   best -   avg -\n\n"},
+        {false, 2, "False start by player 2\nPlayer 1 wins\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0},
+         "Player 1   last 0: -   best -   avg -\nPlayer 2   last 0: -   best -   avg -\n\n"},
+        {false, 3, "Draw\nScore: player 1 - 0, player 2 - 0\n\n", {255, 255, 255},
+         "Player 1   last 0: -   best -   avg -\nPlayer 2   last 0: -   best -   avg -\n\n"},
+        {true, 1, "Player 1 wins in 231 ms\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0},
+         "Player 1   last 1: 231   best 231   avg 231\nPlayer 2   last 0: -   best -   avg -\n\n"},
+        {true, 2, "Player 2 wins in 231 ms\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255},
+         "Player 1   last 0: -   best -   avg -\nPlayer 2   last 1: 231   best 231   avg 231\n\n"},
+        {true, 3, "Draw\nScore: player 1 - 0, player 2 - 0\n\n", {255, 255, 255},
+         "Player 1   last 1: 231   best 231   avg 231\nPlayer 2   last 1: 231   best 231   avg 231\n\n"}
     };
     for (const auto &row : rows) {
         SCOPED_TRACE(row.text);
@@ -394,7 +403,7 @@ TEST_F(FirmwareTest, GameFinishRound) {
         fake_arduino::now_ms += 231U;
         press(row.pressed);
         game.update();  // Calls the private finishRound through every outcome.
-        EXPECT_EQ(Serial.output, row.text);
+        EXPECT_EQ(Serial.output, std::string(row.text) + row.histories);
         expectColour(row.colour.red, row.colour.green, row.colour.blue);
         Serial.output.clear();
         const uint32_t result_time = fake_arduino::now_ms;
@@ -465,18 +474,40 @@ TEST_F(FirmwareTest, Loop) {
         const char *result;
         Colour colour;
         const char *next_score;
+        const char *histories;
+        const char *next_histories;
     };
     const Row rows[] = {
-        {1500, 2000, true, 0, 1, "Player 1 wins in 0 ms\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0}, "Score: player 1 - 2, player 2 - 0\n\n"},
-        {1500, 3500, true, 1, 2, "Player 2 wins in 1 ms\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255}, "Score: player 1 - 1, player 2 - 1\n\n"},
-        {1500, 5000, true, 231, 3, "Draw\nScore: player 1 - 0, player 2 - 0\n\n", {255, 255, 255}, "Score: player 1 - 1, player 2 - 0\n\n"},
-        {1500, 2000, true, 65535, 1, "Player 1 wins in 65535 ms\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0}, "Score: player 1 - 2, player 2 - 0\n\n"},
-        {1500, 2000, true, UINT32_MAX, 2, "Player 2 wins in 4294967295 ms\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255}, "Score: player 1 - 1, player 2 - 1\n\n"},
-        {UINT32_MAX - 1000U, 2000, true, 231, 1, "Player 1 wins in 231 ms\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0}, "Score: player 1 - 2, player 2 - 0\n\n"},
-        {UINT32_MAX - 2400U, 2000, true, 231, 2, "Player 2 wins in 231 ms\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255}, "Score: player 1 - 1, player 2 - 1\n\n"},
-        {1500, 2000, false, 1999, 1, "False start by player 1\nPlayer 2 wins\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255}, "Score: player 1 - 1, player 2 - 1\n\n"},
-        {1500, 2000, false, 2000, 2, "False start by player 2\nPlayer 1 wins\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0}, "Score: player 1 - 2, player 2 - 0\n\n"},
-        {1500, 2000, false, 2001, 3, "Draw\nScore: player 1 - 0, player 2 - 0\n\n", {255, 255, 255}, "Score: player 1 - 1, player 2 - 0\n\n"}
+        {1500, 2000, true, 0, 1, "Player 1 wins in 0 ms\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0}, "Score: player 1 - 2, player 2 - 0\n\n",
+         "Player 1   last 1: 0   best 0   avg 0\nPlayer 2   last 0: -   best -   avg -\n\n",
+         "Player 1   last 2: 0 231   best 0   avg 115\nPlayer 2   last 0: -   best -   avg -\n\n"},
+        {1500, 3500, true, 1, 2, "Player 2 wins in 1 ms\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255}, "Score: player 1 - 1, player 2 - 1\n\n",
+         "Player 1   last 0: -   best -   avg -\nPlayer 2   last 1: 1   best 1   avg 1\n\n",
+         "Player 1   last 1: 231   best 231   avg 231\nPlayer 2   last 1: 1   best 1   avg 1\n\n"},
+        {1500, 5000, true, 231, 3, "Draw\nScore: player 1 - 0, player 2 - 0\n\n", {255, 255, 255}, "Score: player 1 - 1, player 2 - 0\n\n",
+         "Player 1   last 1: 231   best 231   avg 231\nPlayer 2   last 1: 231   best 231   avg 231\n\n",
+         "Player 1   last 2: 231 231   best 231   avg 231\nPlayer 2   last 1: 231   best 231   avg 231\n\n"},
+        {1500, 2000, true, 65535, 1, "Player 1 wins in 65535 ms\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0}, "Score: player 1 - 2, player 2 - 0\n\n",
+         "Player 1   last 1: 65535   best 65535   avg 65535\nPlayer 2   last 0: -   best -   avg -\n\n",
+         "Player 1   last 2: 65535 231   best 231   avg 32883\nPlayer 2   last 0: -   best -   avg -\n\n"},
+        {1500, 2000, true, UINT32_MAX, 2, "Player 2 wins in 4294967295 ms\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255}, "Score: player 1 - 1, player 2 - 1\n\n",
+         "Player 1   last 0: -   best -   avg -\nPlayer 2   last 1: 65535   best 65535   avg 65535\n\n",
+         "Player 1   last 1: 231   best 231   avg 231\nPlayer 2   last 1: 65535   best 65535   avg 65535\n\n"},
+        {UINT32_MAX - 1000U, 2000, true, 231, 1, "Player 1 wins in 231 ms\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0}, "Score: player 1 - 2, player 2 - 0\n\n",
+         "Player 1   last 1: 231   best 231   avg 231\nPlayer 2   last 0: -   best -   avg -\n\n",
+         "Player 1   last 2: 231 231   best 231   avg 231\nPlayer 2   last 0: -   best -   avg -\n\n"},
+        {UINT32_MAX - 2400U, 2000, true, 231, 2, "Player 2 wins in 231 ms\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255}, "Score: player 1 - 1, player 2 - 1\n\n",
+         "Player 1   last 0: -   best -   avg -\nPlayer 2   last 1: 231   best 231   avg 231\n\n",
+         "Player 1   last 1: 231   best 231   avg 231\nPlayer 2   last 1: 231   best 231   avg 231\n\n"},
+        {1500, 2000, false, 1999, 1, "False start by player 1\nPlayer 2 wins\nScore: player 1 - 0, player 2 - 1\n\n", {0, 0, 255}, "Score: player 1 - 1, player 2 - 1\n\n",
+         "Player 1   last 0: -   best -   avg -\nPlayer 2   last 0: -   best -   avg -\n\n",
+         "Player 1   last 1: 231   best 231   avg 231\nPlayer 2   last 0: -   best -   avg -\n\n"},
+        {1500, 2000, false, 2000, 2, "False start by player 2\nPlayer 1 wins\nScore: player 1 - 1, player 2 - 0\n\n", {255, 0, 0}, "Score: player 1 - 2, player 2 - 0\n\n",
+         "Player 1   last 0: -   best -   avg -\nPlayer 2   last 0: -   best -   avg -\n\n",
+         "Player 1   last 1: 231   best 231   avg 231\nPlayer 2   last 0: -   best -   avg -\n\n"},
+        {1500, 2000, false, 2001, 3, "Draw\nScore: player 1 - 0, player 2 - 0\n\n", {255, 255, 255}, "Score: player 1 - 1, player 2 - 0\n\n",
+         "Player 1   last 0: -   best -   avg -\nPlayer 2   last 0: -   best -   avg -\n\n",
+         "Player 1   last 1: 231   best 231   avg 231\nPlayer 2   last 0: -   best -   avg -\n\n"}
     };
     for (const auto &row : rows) {
         SCOPED_TRACE(row.start);
@@ -518,7 +549,7 @@ TEST_F(FirmwareTest, Loop) {
         fake_arduino::now_ms = result_time;
         press(row.pressed);
         loop();
-        EXPECT_EQ(Serial.output, row.result);
+        EXPECT_EQ(Serial.output, std::string(row.result) + row.histories);
         expectColour(row.colour.red, row.colour.green, row.colour.blue);
         Serial.output.clear();
         for (uint32_t elapsed : {0U, 1U, 1999U}) {
@@ -550,7 +581,7 @@ TEST_F(FirmwareTest, Loop) {
         press(1U);
         fake_arduino::now_ms += 231U;
         loop();
-        EXPECT_EQ(Serial.output, std::string("Player 1 wins in 231 ms\n") + row.next_score);
+        EXPECT_EQ(Serial.output, std::string("Player 1 wins in 231 ms\n") + row.next_score + row.next_histories);
         expectColour(255, 0, 0);
         EXPECT_EQ(fake_arduino::delays, (std::vector<uint32_t>{1500U}));
         EXPECT_EQ(fake_arduino::now_ms, static_cast<uint32_t>(result_time + 2000U + row.pause + 231U));
@@ -569,7 +600,10 @@ TEST_F(FirmwareTest, Loop) {
         press(1U);
         loop();
         if (row.accepted) {
-            EXPECT_EQ(Serial.output, "False start by player 1\nPlayer 2 wins\nScore: player 1 - 0, player 2 - 1\n\n");
+            EXPECT_EQ(Serial.output,
+                      "False start by player 1\nPlayer 2 wins\nScore: player 1 - 0, player 2 - 1\n\n"
+                      "Player 1   last 0: -   best -   avg -\n"
+                      "Player 2   last 0: -   best -   avg -\n\n");
             expectColour(0, 0, 255);
         } else {
             EXPECT_TRUE(Serial.output.empty());
@@ -582,7 +616,10 @@ TEST_F(FirmwareTest, Loop) {
             press(3U);  // Only player 2 has a fresh edge.
             fake_arduino::now_ms = 2231U;
             loop();
-            EXPECT_EQ(Serial.output, "Player 2 wins in 231 ms\nScore: player 1 - 0, player 2 - 1\n\n");
+            EXPECT_EQ(Serial.output,
+                      "Player 2 wins in 231 ms\nScore: player 1 - 0, player 2 - 1\n\n"
+                      "Player 1   last 0: -   best -   avg -\n"
+                      "Player 2   last 1: 231   best 231   avg 231\n\n");
         }
         EXPECT_TRUE(fake_arduino::delays.empty());
     }
@@ -603,7 +640,9 @@ TEST_F(FirmwareTest, Loop) {
             "False start by player 2\nPlayer 1 wins\nScore: player 1 - 1, player 2 - 0\n\n",
             "Draw\nScore: player 1 - 0, player 2 - 0\n\n"
         };
-        EXPECT_EQ(Serial.output, expected[mask - 1U]);
+        EXPECT_EQ(Serial.output, std::string(expected[mask - 1U]) +
+                  "Player 1   last 0: -   best -   avg -\n"
+                  "Player 2   last 0: -   best -   avg -\n\n");
     }
 }
 
