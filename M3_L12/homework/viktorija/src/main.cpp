@@ -5,18 +5,18 @@
 
 #include <Arduino.h>
 #include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
 
-#include "RingBuffer.h"
+#include "LineReader.h"
 
 static const uint32_t SERIAL_BAUD = 115200U;
 static const uint32_t SERIAL_WAIT_MS = 5000U;
 
 static const uint8_t PIN_POT = 26U;
 static const uint16_t MAX_POT_READING = 1023U;
-// Potentiometer smoothing.
-// static const uint8_t SMOOTH_SAMPLES = 16U;
-// static const uint32_t SAMPLE_PERIOD_MS = 20U;
-// static const uint32_t POT_PRINT_PERIOD_MS = 1000U;
+static const uint32_t POT_REQUEST_INTERVAL_MS = 100U;
+static const uint32_t TIMEOUT_MS = 200U;
 
 static const uint32_t PRINT_INTERVAL_MS = 1000U;
 static const uint32_t MS_PER_S = 1000U;
@@ -29,43 +29,54 @@ static uint32_t last_print_ms = 0U;
 static uint32_t last_blink_ms = 0U;
 static bool led_on = false;
 
-// The last 16 potentiometer readings: 32 bytes of data, fixed at compile time.
-// static RingBuffer<uint16_t, SMOOTH_SAMPLES> g_pot_samples;
+static LineReader pot_reader;
+static LineReader led_reader;
 
-// Smooth potentiometer function. Not using it yet. Or maybe at all.
-// static void runPotentiometer(void) {
-//     static uint32_t last_sample_ms = 0U;
-//     static uint32_t last_print_ms = 0U;
-//     static uint16_t last_raw = 0U;
+enum class MasterState : uint8_t {
+    Idle,
+    Waiting
+};
 
-//     const uint32_t now = millis();
+static MasterState g_master_state = MasterState::Idle;
+static uint32_t g_pot_value = 0U;
+static uint32_t last_pot_request_ms = 0U;
+static bool g_link_ok = true;
 
-//     // One new reading per period, not sixteen in a row.
-//     if ((now - last_sample_ms) >= SAMPLE_PERIOD_MS) {
-//         last_sample_ms = now;
-//         last_raw = (uint16_t)analogRead(PIN_POT);
-//         g_pot_samples.push(last_raw);
-//     }
+static void handlePotSide(void) {
+    if (pot_reader.readLine(Serial1) && strcmp(pot_reader.line(), "POT?") == 0) {
+        Serial1.printf("POT %u\n", (unsigned)analogRead(PIN_POT));
+    }
+}
 
-//     if ((now - last_print_ms) < POT_PRINT_PERIOD_MS) {
-//         return;
-//     }
-//     last_print_ms = now;
+static void handleLedSide(void) {
+    uint32_t now = millis();
+    switch (g_master_state) {
+        case MasterState::Idle:
+            while (led_reader.readLine(Serial2)) {}
+            if (now - last_pot_request_ms >= POT_REQUEST_INTERVAL_MS) {
+                last_pot_request_ms = now;
+                Serial2.println("POT?");
+                g_master_state = MasterState::Waiting;
+            }
+            break;
+        case MasterState::Waiting:
+            if (led_reader.readLine(Serial2) && strncmp(led_reader.line(), "POT ", 4U) == 0) {
+                char* end = nullptr;
+                const char* number = led_reader.line() + 4U;
+                const uint32_t value = strtoul(number, &end, 10);
+                if (end != number && *end == '\0' && value <= MAX_POT_READING) {
+                    g_pot_value = value;
+                    g_link_ok = true;
+                    g_master_state = MasterState::Idle;
+                }
+            } else if (now - last_pot_request_ms >= TIMEOUT_MS) {
+                g_link_ok = false;
+                g_master_state = MasterState::Idle;
+            }
 
-//     uint32_t sum = 0U;
-//     uint16_t lowest = 0xFFFFU;
-//     uint16_t highest = 0U;
-//     for (uint8_t i = 0U; i < g_pot_samples.count(); i++) {
-//         const uint16_t v = g_pot_samples.at(i);
-//         sum += v;
-//         lowest = (v < lowest) ? v : lowest;
-//         highest = (v > highest) ? v : highest;
-//     }
-//     const uint16_t smooth = (uint16_t)(sum / g_pot_samples.count());
-
-//     Serial.printf("[pot]   raw %4u   smooth %4u   last 16 spread over %u counts\n",
-//                   (unsigned)last_raw, (unsigned)smooth, (unsigned)(highest - lowest));
-// }
+            break;
+    }
+}
 
 
 void setup(void) {
@@ -74,45 +85,35 @@ void setup(void) {
     Serial.begin(SERIAL_BAUD);
     Serial1.begin(SERIAL_BAUD);
     Serial2.begin(SERIAL_BAUD);
-    // USB serial: wait a bit for the monitor so the first line is not lost
-    while (!Serial && millis() < SERIAL_WAIT_MS)
-    {
-    }
-
-    // Fill the smoothing buffer once so the first average is not over one sample.
-    // for (uint8_t i = 0U; i < SMOOTH_SAMPLES; i++) {
-    //     g_pot_samples.push((uint16_t)analogRead(PIN_POT));
-    // }
-
-    // this line did not print...
-    Serial.printf("CPU clock: %lu MHz\n", rp2040.f_cpu() / HZ_PER_MHZ);
 }
 
 void loop(void) {
     uint32_t now = millis();
-    uint16_t pot_reading = (uint16_t)analogRead(PIN_POT);
-    uint32_t blink_half_interval = HALF_MIN_MS + pot_reading * (HALF_MAX_MS - HALF_MIN_MS) / MAX_POT_READING;
+    uint32_t blink_half_interval = HALF_MIN_MS + g_pot_value * (HALF_MAX_MS - HALF_MIN_MS) / MAX_POT_READING;
 
     if (last_blink_ms == 0U) {
         last_blink_ms = now;
-    } else if (now - last_blink_ms >= blink_half_interval)
+    } else if (now - last_blink_ms >= blink_half_interval && g_link_ok)
     {
         last_blink_ms = now;
         led_on = !led_on;
         digitalWrite(LED_BUILTIN, led_on ? HIGH : LOW);
+    } else if (!g_link_ok) {
+        led_on = false;
+        digitalWrite(LED_BUILTIN, led_on ? HIGH : LOW);
     }
 
-    if (now - last_print_ms >= PRINT_INTERVAL_MS)
+    if (last_print_ms == 0U) {
+        last_print_ms = now;
+    } else if (now - last_print_ms >= PRINT_INTERVAL_MS)
     {
         last_print_ms += PRINT_INTERVAL_MS;
-        Serial.printf("Pico alive, uptime %lu sec, pot: %u, blink half interval: %lu ms\n", now / MS_PER_S, (unsigned)pot_reading, blink_half_interval);
-        Serial1.println("POT?");
+        // Serial.printf("Blink interval: %4lu ms  Value: %4u     State is %s, link %s\n", blink_half_interval, (unsigned) g_pot_value, g_master_state == MasterState::Idle ? "Idle" : "Waiting", g_link_ok ? "OK" : "Not OK");
+        Serial.printf("Blink interval: %4lu ms  Value: %4u     link %s\n", blink_half_interval, (unsigned) g_pot_value, g_link_ok ? "OK" : "Not OK");
     }
 
-    // while (Serial1.available() > 0) {
-    //     Serial.println(Serial1.read());
-    // }
-    while (Serial2.available() > 0) {
-        Serial.println(Serial2.read());
-    }
+    handlePotSide();
+    handleLedSide();
+
+
 }
