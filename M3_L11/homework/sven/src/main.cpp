@@ -36,6 +36,8 @@ void loop() {
         digitalWrite(LED_PIN, ledOn ? HIGH : LOW);
     }
 
+    Serial.printf("can we debug?\n");
+
     if (nowMs - lastReportMs >= REPORT_INTERVAL_MS) {
         lastReportMs = nowMs;
         Serial.printf("Pico alive, uptime %lu s\r\n", (nowMs / MS_PER_SECOND));
