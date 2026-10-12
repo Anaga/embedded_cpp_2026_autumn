@@ -20,6 +20,9 @@ static uint16_t g_potentiometer_reading = 0U;
 // ---------------------------------------------------------------------------
 
 static const uint32_t UPDATE_PERIOD_MS = 250U;
+static const uint32_t UART_BAUD = 115200U;
+static const uint8_t PIN_UART_TX = 0U; // GP0, pin 1 -> Mini GPIO20 (RX)
+static const uint8_t PIN_UART_RX = 1U; // GP1, pin 2 <- Mini GPIO21 (TX)
 
 // ---------------------------------------------------------------------------
 // THE POTENTIOMETER
@@ -34,6 +37,9 @@ static Potentiometer potentiometer{};
 
 void setup(void) {
     Serial.begin(115200);
+    Serial1.setTX(PIN_UART_TX);
+    Serial1.setRX(PIN_UART_RX);
+    Serial1.begin(UART_BAUD);
     delay(1500U);
 
     potentiometer.begin();
@@ -53,5 +59,5 @@ void loop(void) {
     g_last_update_ms = now;
 
     g_potentiometer_reading = potentiometer.read_potentiometer_10bit();
-    Serial.printf("Potentiometer reading: %u\n", (unsigned int) g_potentiometer_reading);
+    Serial1.printf("POT %hu\n", g_potentiometer_reading);
 }

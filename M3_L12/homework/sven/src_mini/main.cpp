@@ -5,8 +5,10 @@
 
 #include <Arduino.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "Led.h"
+#include "LineReader.h"
 
 // ---------------------------------------------------------------------------
 // CONFIGURATION
@@ -21,12 +23,16 @@ static const uint32_t MIN_HALF_PERIOD_MS = 50U;
 static const uint32_t MAX_HALF_PERIOD_MS = 500U;
 static const uint32_t STATUS_PERIOD_MS = 1000U;
 static const uint32_t SERIAL_BAUD = 115200U;
+static const uint8_t PIN_UART_RX = 20U; // GPIO20 <- Pico GP0 (TX), pin 1
+static const uint8_t PIN_UART_TX = 21U; // GPIO21 -> Pico GP1 (RX), pin 2
 
 // ---------------------------------------------------------------------------
 // STATE
 // ---------------------------------------------------------------------------
 
 static uint32_t g_last_status_ms = 0U;
+static uint16_t g_potentiometer_reading = POT_MAX;
+static LineReader g_uart_line;
 
 // ---------------------------------------------------------------------------
 // THE LED
@@ -36,12 +42,24 @@ static uint32_t g_last_status_ms = 0U;
 // settings; begin() in setup() is where the hardware is touched.
 static LedController led(PIN_LED, LED_ACTIVE_LOW);
 
+// Read only bytes that have arrived, so waiting for a line never stops blinking.
+static void receive_potentiometer(void) {
+    while (g_uart_line.readLine(Serial1)) {
+        unsigned int value = 0U;
+        char extra;
+        if (sscanf(g_uart_line.line(), "POT %u%c", &value, &extra) == 1 && value <= POT_MAX) {
+            g_potentiometer_reading = value;
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // ENTRY POINTS
 // ---------------------------------------------------------------------------
 
 void setup(void) {
     Serial.begin(SERIAL_BAUD);
+    Serial1.begin(SERIAL_BAUD, SERIAL_8N1, PIN_UART_RX, PIN_UART_TX);
 
     led.begin();
 
@@ -54,11 +72,10 @@ void setup(void) {
 
 void loop(void) {
     const uint32_t now = millis();
+    receive_potentiometer();
 
-    // Placeholder until UART receives a potentiometer reading in 0..1023.
-    const uint16_t potentiometer_reading = 1023;
     const uint32_t half_period_ms = MIN_HALF_PERIOD_MS
-                                    + (uint32_t) potentiometer_reading
+                                    + g_potentiometer_reading
                                     * (MAX_HALF_PERIOD_MS - MIN_HALF_PERIOD_MS) / POT_MAX;
 
     // Blink timing must run on every iteration, even between status messages.
@@ -69,7 +86,7 @@ void loop(void) {
     }
     g_last_status_ms = now;
 
-    Serial.printf("pot=%u half=%lu ms\n",
-                  potentiometer_reading,
+    Serial.printf("pot=%hu half=%lu ms\n",
+                  g_potentiometer_reading,
                   half_period_ms);
 }
