@@ -15,16 +15,16 @@ Potentiometer::Potentiometer() {
 uint16_t Potentiometer::read_potentiometer(void) {
     uint32_t sum = 0U;
     for (uint8_t i = 0U; i < SAMPLE_COUNT; i++) {
-        sum += (uint32_t) analogRead(POT_PIN);
+        sum += analogRead(POT_PIN);
         delayMicroseconds(SAMPLE_GAP_US);
     }
-    return (uint16_t) (sum / (uint32_t) SAMPLE_COUNT);
+    return sum / SAMPLE_COUNT;
 }
 
 uint16_t Potentiometer::read_potentiometer_10bit(void) {
     const uint16_t reading = read_potentiometer();
     const uint16_t clamped_reading = constrain(reading, POT_MIN, POT_MAX);
-    return (uint16_t) map(clamped_reading, POT_MAX, POT_MIN, 0L, POT_READING_MAX);
+    return map(clamped_reading, POT_MAX, POT_MIN, 0L, POT_READING_MAX);
 }
 
 void Potentiometer::begin(void) {
