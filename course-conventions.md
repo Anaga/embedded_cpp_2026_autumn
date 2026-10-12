@@ -2,7 +2,7 @@
 
 Working agreements for "Embedded Software Development in C/C++".
 Carried over from the 2026 stream and kept current during the 2026 autumn
-stream (last update 2026-10-07, after session 12). This file is the starting
+stream (last update 2026-10-12, before session 13). This file is the starting
 context for a new course project - read it before producing any material.
 
 ---
@@ -50,10 +50,25 @@ Notes on the Picos used in the 2026 autumn stream:
 - Spare boards: buy 1-2 (instructor demo, replacement for a board that dies in
   class).
 
-Peripherals and instruments: OPT4001 ambient light sensor (I2C), Nokia 5110
-LCD (SPI), RGB LED 500RGB4E (common anode), 10k potentiometer, two push
-buttons, WS2812 / NeoPixel strips and a 10-LED ring, multimeter, FX2LP-based
-USB logic analyzer.
+Peripherals and instruments: AHT10 temperature and humidity sensor (I2C,
+3 modules), Nokia 5110 LCD (SPI), RGB LED 500RGB4E (common anode), 10k
+potentiometer, two push buttons, WS2812 / NeoPixel strips and a 10-LED ring,
+multimeter, FX2LP-based USB logic analyzer. The OPT4001 used in earlier plans
+is no longer available (2026-10-12).
+
+Notes on the AHT10:
+
+- I2C address 0x38 (0x39 with ADDR pulled high; on most modules ADDR is tied
+  to GND).
+- Command-based, not register-based: init `0xE1 0x08 0x00`, trigger
+  `0xAC 0x33 0x00`, about 75 ms conversion, then 6 bytes: status (bit 7 busy,
+  bit 3 calibrated), 20-bit humidity, 20-bit temperature. Soft reset `0xBA`.
+- **AHT10 is not AHT20.** The AHT2x family uses init `0xBE` and sends a 7th
+  CRC byte. Most examples online are AHT2x - translate them, do not paste
+  them.
+- Power from 3V3 OUT, never VBUS. If the module pull-ups go to VIN, a 5 V
+  supply puts 5 V on SDA / SCL, and RP2040 pins are not 5 V tolerant.
+- On-board pull-ups: not yet measured (course-program.md, Open decisions 7).
 
 ### Standard pinouts
 
@@ -85,7 +100,7 @@ time; no pin is used twice.
 |---|---|---|---|
 | UART0 (`Serial1`) TX / RX | GP0 / GP1 | 1 / 2 | session 12 |
 | GND next to the UART | - | 3 | session 12 |
-| I2C0 (`Wire`) SDA / SCL - OPT4001 | GP4 / GP5 | 6 / 7 | session 13 |
+| I2C0 (`Wire`) SDA / SCL - AHT10 | GP4 / GP5 | 6 / 7 | session 13 |
 | UART1 (`Serial2`) TX / RX | GP8 / GP9 | 11 / 12 | session 12 homework |
 | RGB LED R / G / B | GP10 / GP11 / GP12 | 14 / 15 / 16 | later |
 | Button A / B | GP14 / GP15 | 19 / 20 | later |
@@ -98,6 +113,8 @@ time; no pin is used twice.
 - No 3.3k series resistor on the Pico potentiometer: the RP2040 ADC reads the
   full 0 .. 3.3 V. The resistor was a C3 workaround.
 - Common anode RGB LED goes to 3V3 OUT (pin 36), as on the C3.
+- The AHT10 also takes its supply from 3V3 OUT (pin 36), via the breadboard
+  rail, with GND from any GND pin.
 
 **RP2350 (TENSTAR)**
 

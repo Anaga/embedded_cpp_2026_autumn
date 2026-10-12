@@ -194,6 +194,13 @@ with real devices. Porting the K3 classes (RgbLed, Button) and the session 11
 timer code is deferred until a session needs the RGB LED, buttons or
 potentiometer again.
 
+Changed 2026-10-12: the OPT4001 is no longer available. Session 13 uses the
+AHT10 temperature and humidity sensor instead (3 modules: one per pair in
+class, one for the instructor). The AHT10 is command-based, not
+register-based, so the register pointer and repeated start stay on the
+slides as theory. Session 14 integration and the session 15 captures follow
+the sensor change.
+
 **Session 11: Hardware timers and interrupt discipline** (2026-10-05)
 - Why a hardware timer when millis() exists: polling vs a hardware event,
   jitter
@@ -246,21 +253,40 @@ potentiometer again.
   timer code (64-bit 1 MHz timer, 4 alarms, pico-sdk repeating timers, no
   IRAM_ATTR, no portENTER_CRITICAL)
 
-**Session 13: I2C and the OPT4001**
+**Session 13: I2C and the AHT10** (plan settled 2026-10-12)
+- Homework check: two UARTs on one Pico, and why a blocking wait for the
+  reply deadlocks
 - GPIO in depth where it is needed: floating inputs, open-drain outputs, why
-  I2C needs pull-ups
-- I2C protocol: start, 7-bit address, R/W, ACK / NACK, register pointer,
-  repeated start, stop
-- I2C scanner as the first test of the wiring
-- OPT4001 by hand with Wire: device ID, configuration, result registers ->
-  exponent and mantissa -> lux
+  I2C needs pull-ups. Students measure the pull-ups on their own module with
+  the multimeter (SDA -> VIN, SCL -> VIN, unpowered), as in session 3
+- I2C protocol: start, 7-bit address, R/W, ACK / NACK, stop. Register pointer
+  and repeated start shown as "how most sensors work"; then register-based vs
+  command-based devices, and why the AHT10 is the second kind
+- Wiring: 3V3 OUT, GND, SDA GP4, SCL GP5. Never VBUS: if the module pull-ups
+  go to VIN, 5 V lands on pins that are not 5 V tolerant
+- I2C scanner as the first test of the wiring: expect 0x38
+- AHT10 by hand with Wire, in pairs: init (0xE1 0x08 0x00) and calibration bit,
+  trigger (0xAC 0x33 0x00), wait about 75 ms in an enum class state machine
+  (no delay() - follows IDLE / WAITING from session 12), read 6 bytes, busy
+  bit, unpack the two 20-bit fields with shifts and masks, convert:
+  RH = raw / 2^20 * 100, T = raw / 2^20 * 200 - 50. Check: breathe on it
+- Trap, same family as core 3.x: most examples online are for the AHT20 /
+  AHT2x (init 0xBE, 7th CRC byte). Translate, do not paste
+- Then the same reading through a library: compare the numbers and see what
+  the library hides. The library is chosen after checking that it supports
+  the AHT10 (not only AHT2x) on Arduino-Pico
+- Demo covers the library version and what the slides show; the by-hand
+  driver is the lab and stays out of the demo
+- Homework: on real hardware, modules go home with the students who do the
+  homework. Content to be confirmed when the homework is written
 
 **Session 14: SPI and the Nokia 5110**
 - SPI: SCK, MOSI, MISO, CS, clock modes. The 5110 is write-only; D/C selects
   command vs data.
 - RAII: a chip-select guard class (deferred from K3 on purpose)
 - Display driver: init sequence, clear, text from a supplied font table
-- Integration: lux from session 13 on the display
+- Integration: temperature and humidity from the session 13 AHT10 on the
+  display
 - Homework includes installing PulseView (plus Zadig on Windows) and
   confirming the analyzer is detected, so session 15 does not start with
   driver problems
@@ -269,9 +295,13 @@ potentiometer again.
 - PulseView with fx2lafw
 - First capture is the session 12 UART link: the 8N1 frame from the slide,
   now measured, baud rate read off the capture
-- I2C and SPI decoders on the students' own working code from sessions 13-14
+- I2C and SPI decoders on the students' own working code from sessions 13-14.
+  The AHT10 capture shows the command write, the ~75 ms conversion gap and
+  the 6-byte read
 - Diagnosis: buses broken on purpose (missing pull-up, wrong address, swapped
-  lines, wrong SPI mode, CS never asserted), found with the analyzer
+  lines, wrong SPI mode, CS never asserted), found with the analyzer. The
+  missing pull-up case depends on whether the AHT10 module has its own
+  pull-ups (Open decisions 7)
 - Stays booked to M5: the analyzer is the subject
 
 ---
@@ -324,6 +354,10 @@ will not use.
    male headers, and buy 1-2 spare boards: one for the instructor demo, one
    to replace a board that dies in class. Pico inventory and toolchain notes
    added to course-conventions.md 2026-10-07.
+7. **AHT10 modules before session 13.** Measure whether the modules carry
+   their own pull-ups and where they go (VIN or an on-board LDO output).
+   Decides how the pull-up slide is shown and whether session 15 can break
+   the bus by removing a pull-up. Pick the library for the comparison step.
 
 ---
 
@@ -372,8 +406,9 @@ What the students already have and can use:
 Consequence for K4: PWM, ADC basics, button debounce and first
 interrupts are already done. K4 re-planned 2026-10-05 around what is
 left: 11 timers and ISR discipline (ESP32-C3), 12 soldering + three
-buses + UART on the Pico, 13 I2C (OPT4001), 14 SPI (Nokia 5110), 15
-logic analyzer. Details in the K4 section of the core session outline.
+buses + UART on the Pico, 13 I2C (AHT10, replaced the OPT4001 on
+2026-10-12), 14 SPI (Nokia 5110), 15 logic analyzer. Details in the K4
+section of the core session outline.
 
 Deferred into K4 on purpose:
 - RAII -> session 14, as a chip-select guard class
