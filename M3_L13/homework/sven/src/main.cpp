@@ -6,18 +6,16 @@
 #include "Aht10.h"
 
 namespace {
+    Aht10 aht;
+    repeating_timer_t readTimer;
+    volatile bool readDue = false;
+    bool missingReported = false;
 
-Aht10 aht;
-repeating_timer_t readTimer;
-volatile bool readDue = false;
-bool missingReported = false;
-
-bool onReadTimer(repeating_timer_t *) {
-    readDue = true;  // Interrupt: signal only. I2C and Serial stay in loop().
-    return true;
-}
-
-}  // namespace
+    bool onReadTimer(repeating_timer_t *) {
+        readDue = true; // Interrupt: signal only. I2C and Serial stay in loop().
+        return true;
+    }
+} // namespace
 
 void setup() {
     Serial.begin(115200);
@@ -26,7 +24,7 @@ void setup() {
 
     // Negative interval: 2000 ms between callback starts. First read in 2 s.
     if (!add_repeating_timer_ms(-2000, onReadTimer, nullptr, &readTimer)) {
-        Serial.println("timer unavailable");
+        Serial.printf("timer unavailable\r\n");
     }
 }
 
@@ -44,13 +42,14 @@ void loop() {
     const Aht10::Status status = aht.poll();
     if (status == Aht10::Status::Ready) {
         missingReported = false;
-        Serial.print("T = ");
-        Serial.print(aht.temperature(), 2);
-        Serial.print(" C   RH = ");
-        Serial.print(aht.humidity(), 2);
-        Serial.println(" %");
+        // Convert first so printf does not need floating-point support.
+        char temperature[16];
+        char humidity[16];
+        dtostrf(aht.temperature(), 0, 2, temperature);
+        dtostrf(aht.humidity(), 0, 2, humidity);
+        Serial.printf("T = %s C   RH = %s %%\r\n", temperature, humidity);
     } else if (status == Aht10::Status::Missing && !missingReported) {
-        Serial.println("sensor missing");
+        Serial.printf("sensor missing\r\n");
         missingReported = true;
     }
 
