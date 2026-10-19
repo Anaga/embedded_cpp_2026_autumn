@@ -22,5 +22,7 @@ public:
     void show(const Aht10::History &history);
 
 private:
+    void drawScaleLabel(float value, uint8_t tickY);
+
     Adafruit_PCD8544 &m_lcd;
 };

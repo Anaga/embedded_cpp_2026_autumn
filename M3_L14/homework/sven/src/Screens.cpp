@@ -9,14 +9,17 @@ static const uint8_t UNIT_X = 72U;
 static const uint8_t VALUE_WIDTH = UNIT_X - VALUE_X;
 static const uint8_t DECIMAL_PLACES = 1U;
 
-static const uint8_t BAR_WIDTH = 5U;
+static const uint8_t SCALE_LABEL_WIDTH = 30U;  // Five characters, e.g. -50.0.
+static const uint8_t TICK_WIDTH = 3U;
+static const uint8_t AXIS_X = SCALE_LABEL_WIDTH + 1U;
+static const uint8_t CHART_X = AXIS_X + TICK_WIDTH;
+static const uint8_t CHART_WIDTH = LCDWIDTH - CHART_X;
 static const uint8_t BAR_GAP = 1U;
-static const uint8_t BAR_STEP = BAR_WIDTH + BAR_GAP;
-static const uint8_t CHART_HEIGHT = LCDHEIGHT - LINE_HEIGHT_PX;
+static const uint8_t CHART_HEIGHT = LCDHEIGHT;
 static const uint8_t MIN_BAR_HEIGHT = 2U;
 
-static_assert(Aht10::HISTORY_CAPACITY * BAR_STEP == LCDWIDTH,
-              "History bars must fill the LCD width");
+static_assert(CHART_WIDTH / Aht10::HISTORY_CAPACITY > BAR_GAP,
+              "Each history bar needs room beside its gap");
 
 NowScreen::NowScreen(Adafruit_PCD8544 &lcd) : m_lcd(lcd) {
 }
@@ -63,17 +66,28 @@ void NowScreen::update(bool valid, float temperature, float humidity) {
 HistoryScreen::HistoryScreen(Adafruit_PCD8544 &lcd) : m_lcd(lcd) {
 }
 
+void HistoryScreen::drawScaleLabel(float value, uint8_t tickY) {
+    int16_t labelY = static_cast<int16_t>(tickY)
+                      - static_cast<int16_t>(LINE_HEIGHT_PX / 2U);
+    if (labelY < 0) {
+        labelY = 0U;
+    } else if (labelY > LCDHEIGHT - LINE_HEIGHT_PX) {
+        labelY = LCDHEIGHT - LINE_HEIGHT_PX;
+    }
+
+    m_lcd.setCursor(0U, labelY);
+    m_lcd.print(value, DECIMAL_PLACES);
+    m_lcd.drawFastHLine(AXIS_X, tickY, TICK_WIDTH, BLACK);
+}
+
 void HistoryScreen::show(const Aht10::History &history) {
     m_lcd.clearDisplay();
     m_lcd.setTextSize(FONT_SIZE);
     m_lcd.setTextColor(BLACK);
     m_lcd.setTextWrap(false);
-    m_lcd.setCursor(0U, 0U);
-    m_lcd.print("T ");
 
     const uint8_t count = history.count();
     if (count == 0U) {
-        m_lcd.print("--..--");
         m_lcd.display();
         return;
     }
@@ -89,20 +103,26 @@ void HistoryScreen::show(const Aht10::History &history) {
             highest = value;
         }
     }
-    m_lcd.print(lowest, DECIMAL_PLACES);
-    m_lcd.print("..");
-    m_lcd.print(highest, DECIMAL_PLACES);
-
     const float range = highest - lowest;
-    const uint8_t firstX = (Aht10::HISTORY_CAPACITY - count) * BAR_STEP;
+    m_lcd.drawFastVLine(AXIS_X, 0U, CHART_HEIGHT, BLACK);
+    drawScaleLabel(lowest, LCDHEIGHT - MIN_BAR_HEIGHT);
+    if (range > 0.0F) {
+        drawScaleLabel(highest, 0U);
+        const uint8_t middleY = LCDHEIGHT - MIN_BAR_HEIGHT
+                                - (CHART_HEIGHT - MIN_BAR_HEIGHT) / 2U;
+        drawScaleLabel((lowest + highest) / 2.0F, middleY);
+    }
+
     for (uint8_t i = 0U; i < count; ++i) {
         uint8_t height = MIN_BAR_HEIGHT;
         if (range > 0.0F) {
             const float fraction = (history.at(i) - lowest) / range;
             height += static_cast<uint8_t>(fraction * (CHART_HEIGHT - MIN_BAR_HEIGHT));
         }
-        m_lcd.fillRect(firstX + i * BAR_STEP, LCDHEIGHT - height,
-                       BAR_WIDTH, height, BLACK);
+        const uint8_t slot = Aht10::HISTORY_CAPACITY - count + i;
+        const uint8_t x = CHART_X + slot * CHART_WIDTH / Aht10::HISTORY_CAPACITY;
+        const uint8_t nextX = CHART_X + (slot + 1U) * CHART_WIDTH / Aht10::HISTORY_CAPACITY;
+        m_lcd.fillRect(x, LCDHEIGHT - height, nextX - x - BAR_GAP, height, BLACK);
     }
     m_lcd.display();
 }
