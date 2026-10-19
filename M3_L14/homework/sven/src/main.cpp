@@ -10,6 +10,7 @@
 // Wiring (course pin map):
 //   5110: RST GP21, CE GP17, DC GP20, DIN GP19, CLK GP18, VCC 3V3 OUT, GND
 //   AHT10: SDA GP4, SCL GP5, VIN 3V3 OUT, GND
+//   Button: GP14 / GND, using the internal pull-up
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -20,6 +21,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_PCD8544.h>
 
+#include "Button.h"
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -27,6 +30,7 @@
 static const uint8_t PIN_LCD_CS = 17U;   // CE on the module
 static const uint8_t PIN_LCD_DC = 20U;
 static const uint8_t PIN_LCD_RST = 21U;
+static const uint8_t PIN_BUTTON = 14U;
 static const uint8_t PIN_HEARTBEAT = LED_BUILTIN;  // GP25 (PIN_LED is a core macro)
 
 static const uint8_t LCD_CONTRAST = 0x31U;  // Vop: tune for your module
@@ -48,6 +52,7 @@ static const uint32_t MS_PER_S = 1000U;
 
 Adafruit_PCD8544 lcd(PIN_LCD_DC, PIN_LCD_CS, PIN_LCD_RST);  // hardware SPI0
 Adafruit_AHTX0 aht;
+Button button(PIN_BUTTON);
 
 static bool sensorFound = false;
 static uint32_t lastReadMs = 0U;
@@ -135,6 +140,7 @@ void setup()
 {
     Serial.begin(115200);
     pinMode(PIN_HEARTBEAT, OUTPUT);
+    button.begin();
 
     Wire.begin();                       // I2C0 on GP4 / GP5
     lcd.begin(LCD_CONTRAST, LCD_BIAS);  // reset, init, shows the splash image
@@ -146,6 +152,10 @@ void setup()
 
 void loop()
 {
+    if (button.wasPressed()) {
+        Serial.printf("Button pressed\n");
+    }
+
     const uint32_t now = millis();
 
     if (now - lastReadMs >= READ_PERIOD_MS) {
