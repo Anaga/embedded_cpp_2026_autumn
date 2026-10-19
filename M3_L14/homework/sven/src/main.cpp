@@ -13,6 +13,8 @@
 #include "Screens.h"
 
 static const uint8_t PIN_LCD_CS = 17U;
+static const uint8_t PIN_LCD_CLK = 18U;
+static const uint8_t PIN_LCD_DIN = 19U;
 static const uint8_t PIN_LCD_DC = 20U;
 static const uint8_t PIN_LCD_RST = 21U;
 static const uint8_t PIN_BUTTON = 14U;
@@ -21,12 +23,14 @@ static const uint8_t LCD_CONTRAST = 0x31U;
 static const uint8_t LCD_BIAS = 0x04U;
 static const uint32_t SERIAL_BAUD = 115200U;
 static const uint8_t DECIMAL_PLACES = 1U;
+static const uint8_t READING_TEXT_SIZE = 8U;
 static const uint32_t READ_PERIOD_MS = 1000U;
 static const uint32_t BLINK_PERIOD_MS = 500U;
 
 enum class Screen : uint8_t { Now, History };
 
-Adafruit_PCD8544 lcd(PIN_LCD_DC, PIN_LCD_CS, PIN_LCD_RST);
+// Software SPI with all five pins explicit.
+Adafruit_PCD8544 lcd(PIN_LCD_CLK, PIN_LCD_DIN, PIN_LCD_DC, PIN_LCD_CS, PIN_LCD_RST);
 Aht10 aht;
 Button button(PIN_BUTTON);
 NowScreen nowScreen(lcd);
