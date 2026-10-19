@@ -76,13 +76,13 @@ void loop() {
         }
 
         if (aht.valid()) {
-            Serial.print("T ");
-            Serial.print(aht.temperature(), DECIMAL_PLACES);
-            Serial.print(" C  RH ");
-            Serial.print(aht.humidity(), DECIMAL_PLACES);
-            Serial.println(" %");
+            char temperature[READING_TEXT_SIZE];
+            char humidity[READING_TEXT_SIZE];
+            dtostrf(aht.temperature(), 0, DECIMAL_PLACES, temperature);
+            dtostrf(aht.humidity(), 0, DECIMAL_PLACES, humidity);
+            Serial.printf("T %s C  RH %s %%\n", temperature, humidity);
         } else {
-            Serial.println("sensor missing");
+            Serial.printf("sensor missing\n");
         }
     }
 
