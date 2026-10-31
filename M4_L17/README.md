@@ -52,7 +52,17 @@ Power the modules from 3V3, never from 5V.
    successfully" above those lines.
    Without Run after programming: Disconnect, then press NRST.
 
-No DFU device? Use a data cable, not a charge-only one, and repeat step 1.
+No DFU device?
+
+- Use a data cable, not a charge-only one, no hub or dock, and repeat step 1.
+- **macOS:** the bootloader is a new USB accessory and macOS asks "Allow
+  accessory to connect?" - easy to miss. Set System Settings -> Privacy &
+  Security -> Allow accessories to connect -> **Automatically When
+  Unlocked**, then repeat step 1 and press refresh in CubeProgrammer.
+- Check that the computer sees the bootloader (`STM32 BOOTLOADER`, VID
+  0x0483, PID 0xdf11):
+  - macOS: `system_profiler SPUSBHostDataType | grep -i -A8 bootloader`
+  - Windows: Device Manager -> Universal Serial Bus devices
 
 ## 4. What you should see
 

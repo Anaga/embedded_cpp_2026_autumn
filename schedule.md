@@ -36,17 +36,17 @@ selection is decided (open decision 1 in the program).
 | 12 | M4_L2  | 41   | Wed/Fri | K4: Timers, interrupts, ISR discipline    |
 | 13 | M4_L3  | 42   | Mon/Wed | K4: UART, I2C, SPI with sensors           |
 | 14 | M5_L1  | 42   | Wed/Fri | K4: Logic analyzer, bus diagnosis         |
-| 15 | M4_L4  | 43   | Mon/Wed | Optional block 1                          |
-| 16 | M4_L5  | 43   | Wed/Fri | Optional block 1                          |
-| 17 | M4_L6  | 44   | Mon/Wed | Optional block 2                          |
-| 18 | M4_L7  | 44   | Wed/Fri | Optional block 2                          |
-| 19 | M4_L8  | 45   | Mon/Wed | Optional block 3 (or S6, 4 h)             |
-| 20 | M5_L2  | 45   | Wed/Fri | S5: Testing and CI                        |
-| 21 | M5_L3  | 46   | Mon/Wed | S5: Testing and CI                        |
-| 22 | M4_L9  | 46   | Wed/Fri | Z1: Cross-platform comparison             |
-| 23 | M6_L1  | 47   | Mon/Wed | Z2: Final project                         |
-| 24 | M6_L2  | 47   | Wed/Fri | Z2: Final project                         |
-| 25 | M6_L3  | 48   | Mon/Wed | Z2: Final project, demo day               |
+| 15 | M3_L15 | 43   | Mon/Wed | K4: Logic analyzer, bus diagnosis         |
+| 16 | M4_L16 | 44   | Mon     | S1: STM32 Black Pill, CubeMX and HAL      |
+| 17 | M4_L17 | 44   | Fri     | S1: STM32, the ready-made project         |
+| 18 | M4_L18 | 45   | Mon     | S3: ESP32-C3 WiFi, web server, JSON       |
+| 19 | M4_L19 | 45   | Fri     | S3: ESP-NOW                               |
+| 20 | M5_L20 | 46   | Mon     | S3: MQTT and network diagnosis            |
+| 21 | M5_L21 | 46   | Fri     | CAN (TWAI) and bus diagnosis              |
+| 22 | M4_L22 | 47   | Mon     | Z1: Cross-platform comparison             |
+| 23 | M6_L23 | 47   | Fri     | Z2: Final project                         |
+| 24 | M6_L24 | 48   | Mon     | Z2: Final project                         |
+| 25 | M6_L25 | 48   | Fri     | Z2: Final project, demo day (2026-11-25)  |
 
 ---
 
@@ -68,6 +68,11 @@ selection is decided (open decision 1 in the program).
 - Total span: weeks 35-48, just over 13 weeks. The course description says
   9-12 weeks; accepted as-is for this cohort.
 - No Estonian public holidays fall in the Sep - Nov range.
+- Updated 2026-10-31: sessions 1-17 delivered. Rows 1-14 keep the
+  original plan; the real lesson folders are named by session number
+  (M3_L11 .. M3_L15 for K4, M4_L16 and M4_L17 for STM32), and sessions
+  11-15 shifted by one against the rows above after the Pico switch.
+  Optional block choice and hour booking: see course-program.md.
 - Slippage buffer: sessions 15-19 (optional blocks). If the group falls
   behind, drop or shorten an optional block. The core (sessions 1-14) and
   the closing section (sessions 22-25) are not touched.
