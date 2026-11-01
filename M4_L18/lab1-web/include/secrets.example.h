@@ -1,0 +1,14 @@
+// Copy this file to secrets.h (same folder) and fill it in.
+// secrets.h is listed in .gitignore and must never be committed.
+#pragma once
+#include <cstdint>
+
+// true  -> the board is its own access point (no router needed):
+//          join the WiFi network "esp-xxxx" with AP_PASS,
+//          then open http://192.168.4.1/
+// false -> the board joins WIFI_SSID as a station
+constexpr bool USE_SOFTAP = false;
+
+constexpr const char *WIFI_SSID = "your-ssid";
+constexpr const char *WIFI_PASS = "your-password";
+constexpr const char *AP_PASS   = "embedded2026";   // at least 8 characters
