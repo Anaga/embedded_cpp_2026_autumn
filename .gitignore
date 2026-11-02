@@ -81,3 +81,6 @@ cmake-build-*/
 
 # Temporary folder created by editors
 .tmp.driveupload/
+
+# Never pus secrets to git
+*secret*
