@@ -21,7 +21,8 @@ constexpr uint8_t GATEWAY_MAC[6] = {0x58, 0xCF, 0x79, 0x00, 0x00, 0x00};
 ## Wiring
 
 Session 18 wiring: AHT10 SDA GPIO 8, SCL GPIO 9, VIN 3V3, GND. Button A on
-GPIO 0, RGB LED on 5 / 6 / 7. The LED flashes green on SUCCESS, red on FAIL.
+GPIO 0, RGB LED on 5 / 6 / 7. The LED works as in labs 1 and 2 (red blink =
+woke up, blue = awake, green = asleep); three red blinks = FAIL, no ACK.
 
 GPIO 8 and 9 are strapping pins. The AHT10 pull-ups keep them HIGH at
 reset, which is the normal boot. GPIO 9 is also the BOOT button.
@@ -36,12 +37,12 @@ Lesson 19 - Lab 3 - sleeping node esp-aab8
    AHT10 22.4 C 38.1 %
    scanning for "the-class-router"...
    ch 6  seq 1  -> SUCCESS
-   awake 10 s - upload now
-   awake 2412 ms (+12000 waiting), sleeping 20 s
+   awake 30 s - LED blue, upload now
+   awake 2412 ms (+32300 waiting), sleeping 20 s
 #2 timer
    AHT10 22.4 C 38.0 %
    ch 6  seq 2  -> SUCCESS
-   awake 160 ms (+2000 waiting), sleeping 20 s
+   awake 160 ms (+2300 waiting), sleeping 20 s
 ```
 
 Then open the gateway page (address on the whiteboard) and find your

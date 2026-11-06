@@ -18,12 +18,12 @@ deep sleep and still knows the exact time.
 ## What the board does
 
 1. **Cold start** (power-on or RESET): WiFi on -> NTP -> WiFi off -> deep
-   sleep. Stay awake 10 s after the cold start, so an upload can start
+   sleep. Stay awake 30 s after the cold start, so an upload can start
    (as in the labs).
 2. **Timer wake every 10 minutes**: blink the green LED (GPIO 6), print
    the exact local time, sleep again. No WiFi.
 3. **Button A** (GPIO 0) wakes the board at once: blink, print the time,
-   stay awake 10 s. The next timer wake comes 10 minutes **after the
+   stay awake 30 s. The next timer wake comes 10 minutes **after the
    press**, not at the old time.
 4. **Before every sleep** print when the next wake will be.
 5. **Once an hour**: on the first wake after the hour is over, turn WiFi

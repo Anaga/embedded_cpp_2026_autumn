@@ -432,8 +432,8 @@ all boards on WiFi, page and /status worked for everyone.
 same day). Widened from ESP-NOW alone at the instructor's request: power
 saving and NTP come first, so ESP-NOW answers a question the group has
 already felt - "why not just WiFi, we are always online and on USB?". Package
-M4_L19: slides (26), lab1-sleep, lab2-ntp, lab3-node, lab3-gateway (runs on
-the instructor's board), homework. Folders named lab1..lab3 as in L18, no
+M4_L19: slides (26), lab1-sleep, lab2-ntp, lab3-node (C3), lab3-gateway (the
+instructor's Lolin S3 / S3 Mini, envs s3mini / s3 / c3), homework. Folders named lab1..lab3 as in L18, no
 single demo/.
 - Order: homework 18 check (15 min) -> power modes (45, lab 1) -> exact time
   (30, lab 2) -> ESP-NOW (40, demo) -> lab 3 (40) -> summary (10)
@@ -444,9 +444,13 @@ single demo/.
   RTC_DATA_ATTR (8 KB RTC memory) and the RTC timer survive. Wake sources:
   timer, GPIO 0-5 only (button A on GPIO 0), RESET. Wake cause switch.
   USB Serial/JTAG disappears in deep sleep; the PlatformIO monitor
-  reconnects by itself; upload by pressing RESET or button A for a 10 s
-  awake window, BOOT + RESET as last resort. LED pins held HIGH through
-  sleep with gpio_hold_en + gpio_deep_sleep_hold_en
+  reconnects by itself; upload by pressing RESET or button A for a 30 s
+  awake window, BOOT + RESET as last resort. The board sleeps on the USB
+  cable too. RGB LED as a state display in every lab (asked for on
+  2026-11-06): red blink = woke up, blue = awake and COM port up, green =
+  asleep (held LOW with gpio_hold_en + gpio_deep_sleep_hold_en). Lab 1:
+  30 s awake, 60 s asleep on every wake; lab 2: 60 s sleep, 30 s window on
+  cold start and button; lab 3 node: 20 s sleep, three red blinks on FAIL
 - Time: configTzTime with the Tallinn POSIX TZ string
   (EET-2EEST,M3.5.0/3,M10.5.0/4), NTP once on a cold start, WiFi off, the
   RTC keeps time across deep sleep; TZ must be set again on every wake;
@@ -597,11 +601,12 @@ will not use.
     on core 2.x with platform = platformio/espressif32.
 13. **Session 19 bench test - open (2026-11-06).** Build all four M4_L19
     projects on the instructor's machine and check on the C3: (a)
-    gpio_deep_sleep_hold_en() compiles on core 2.x and keeps the RGB LED off
+    gpio_deep_sleep_hold_en() compiles on core 2.x and keeps the green LED on
     in deep sleep; (b) button A on GPIO 0 does not wake the board by itself
     (else an external 10k pull-up); (c) the node's channel change through
     esp_wifi_set_promiscuous + esp_wifi_set_channel works and node + gateway
-    exchange packets. Fix the class router's channel for the evening.
+    exchange packets (gateway on the Lolin S3). Fix the class router's channel
+    for the evening.
 14. **Secrets in the cohort repository - fixed 2026-11-06.**
     M4_L18/lab1-web/include/secrets.h with the class router password was
     committed, and that lab's .gitignore did not list secrets.h. Removed and

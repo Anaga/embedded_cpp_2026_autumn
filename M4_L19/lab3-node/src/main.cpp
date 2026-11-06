@@ -9,6 +9,10 @@
 // the channel in RTC memory. After MAX_FAILS failed sends in a row it
 // scans again (the router may have moved to another channel).
 //
+// LED, as in labs 1 and 2: red blink = just woke up, blue = awake,
+// green = asleep (held LOW through deep sleep). Three red blinks = the
+// gateway did not acknowledge the packet. Blinks count as "waiting".
+//
 // Before the first build: fill in include/class_net.h (whiteboard).
 //
 // Wiring (session 18):
@@ -43,9 +47,11 @@ constexpr uint8_t LED_PINS[] = {PIN_LED_R, PIN_LED_G, PIN_LED_B};
 // ---------------------------------------------------------------- timing
 constexpr uint64_t US_PER_S           = 1000000ULL;
 constexpr uint64_t SLEEP_S            = 20;
-constexpr uint32_t AWAKE_WINDOW_MS    = 10000;  // time to start an upload
+constexpr uint32_t AWAKE_WINDOW_MS    = 30000;  // blue: time to start an upload
 constexpr uint32_t SERIAL_WAIT_MS     = 2000;   // USB comes back after a wake
-constexpr uint32_t FLASH_MS           = 50;
+constexpr uint32_t RED_BLINK_MS       = 300;
+constexpr uint32_t FAIL_BLINK_MS      = 150;
+constexpr uint8_t  FAIL_BLINKS        = 3;
 constexpr uint32_t RELEASE_TIMEOUT_MS = 5000;
 constexpr uint32_t RELEASE_POLL_MS    = 10;
 constexpr uint32_t SEND_TIMEOUT_MS    = 100;    // the ACK normally takes a few ms
@@ -67,7 +73,7 @@ RTC_DATA_ATTR static uint8_t  failCount   = 0;
 RTC_DATA_ATTR static uint16_t prevAwakeMs = 0;
 
 // ---------------------------------------------------------------- state
-static uint32_t waitedMs = 0;       // this wake: USB wait + upload window
+static uint32_t waitedMs = 0;       // this wake: blinks + USB wait + upload window
 static char deviceId[MSG_NAME_LEN];  // "esp-xxxx"
 static Adafruit_AHTX0 aht;
 
@@ -76,32 +82,41 @@ static volatile bool sendDone = false;
 static volatile bool sendOk   = false;
 
 // ---------------------------------------------------------------- LED
-// See lab 1: hold the LED pins HIGH (off) through deep sleep.
+// See lab 1. Common anode: LOW = on.
+static void ledSet(bool r, bool g, bool b) {
+  digitalWrite(PIN_LED_R, r ? LOW : HIGH);
+  digitalWrite(PIN_LED_G, g ? LOW : HIGH);
+  digitalWrite(PIN_LED_B, b ? LOW : HIGH);
+}
+
 static void ledsBegin() {
   for (uint8_t pin : LED_PINS) {
     gpio_hold_dis(static_cast<gpio_num_t>(pin));
     pinMode(pin, OUTPUT);
-    digitalWrite(pin, HIGH);
   }
+  ledSet(false, false, false);
 }
 
-static void ledsHoldOff() {
+static void holdSleepColour() {
+  ledSet(false, true, false);         // green on through deep sleep
   for (uint8_t pin : LED_PINS) {
-    digitalWrite(pin, HIGH);
     gpio_hold_en(static_cast<gpio_num_t>(pin));
   }
   gpio_deep_sleep_hold_en();
 }
 
-static void flash(uint8_t pin) {
-  digitalWrite(pin, LOW);
-  delay(FLASH_MS);
-  digitalWrite(pin, HIGH);
-}
-
 static void waitMs(uint32_t ms) {
   delay(ms);
   waitedMs += ms;
+}
+
+static void blinkFail() {
+  for (uint8_t i = 0; i < FAIL_BLINKS; i++) {
+    ledSet(true, false, false);
+    waitMs(FAIL_BLINK_MS);
+    ledSet(false, false, true);       // back to blue
+    waitMs(FAIL_BLINK_MS);
+  }
 }
 
 // ---------------------------------------------------------------- helpers
@@ -230,7 +245,7 @@ static void goToSleep() {
   Serial.flush();
 
   WiFi.mode(WIFI_OFF);
-  ledsHoldOff();
+  holdSleepColour();
   esp_sleep_enable_timer_wakeup(SLEEP_S * US_PER_S);
   esp_deep_sleep_enable_gpio_wakeup(1ULL << PIN_BUTTON, ESP_GPIO_WAKEUP_GPIO_LOW);
   esp_deep_sleep_start();             // does not return
@@ -243,6 +258,9 @@ void setup() {
 
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   ledsBegin();
+  ledSet(true, false, false);         // red blink: just woke up
+  waitMs(RED_BLINK_MS);
+  ledSet(false, false, true);         // blue: awake
   makeDeviceId();
 
   Serial.begin(115200);
@@ -291,13 +309,13 @@ void setup() {
         failCount = ok ? 0 : static_cast<uint8_t>(failCount + 1);
         Serial.printf("   ch %u  seq %u  -> %s\n", channel, seq,
                       ok ? "SUCCESS" : "FAIL (no ACK from the gateway)");
-        flash(ok ? PIN_LED_G : PIN_LED_R);
+        if (!ok) blinkFail();
       }
     }
   }
 
   if (cause != ESP_SLEEP_WAKEUP_TIMER) {
-    Serial.printf("   awake %lu s - upload now\n",
+    Serial.printf("   awake %lu s - LED blue, upload now\n",
                   static_cast<unsigned long>(AWAKE_WINDOW_MS / 1000U));
     waitMs(AWAKE_WINDOW_MS);
   }

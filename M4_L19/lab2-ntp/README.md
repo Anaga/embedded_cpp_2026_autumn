@@ -9,7 +9,10 @@ local time from the RTC, with no WiFi at all.
 Copy `include/secrets.example.h` to `include/secrets.h` and fill in the
 class WiFi (on the whiteboard). Never commit `secrets.h`.
 
-Wiring: as in lab 1 (button A on GPIO 0, RGB LED on 5 / 6 / 7).
+Wiring: as in lab 1 (button A on GPIO 0, RGB LED on 5 / 6 / 7). The LED
+works as in lab 1: red blink = just woke up, blue = awake, green = asleep.
+Sleep is 60 s; after a cold start or a button press the board stays awake
+(blue) for 30 s, so an upload can start.
 
 ## Run
 
@@ -18,15 +21,15 @@ Expected output (your numbers differ):
 ```
 Lesson 19 - Lab 2 - NTP once, then sleep
    WiFi 1840 ms, NTP 212 ms
-   awake 10 s - upload now
-2026-11-06 19:12:15  #1  cold    awake 2068 ms (+12000 waiting)
-2026-11-06 19:12:37  #2  timer   awake 3 ms (+2000 waiting)
-2026-11-06 19:12:59  #3  timer   awake 3 ms (+2000 waiting)
+   awake 30 s - LED blue, upload now
+2026-11-06 19:12:35  #1  cold    awake 2068 ms (+32300 waiting)
+2026-11-06 19:13:37  #2  timer   awake 3 ms (+2300 waiting)
+2026-11-06 19:14:39  #3  timer   awake 3 ms (+2300 waiting)
 ```
 
 - **awake** is what the board really needs for its job.
-- **waiting** is only for us: the pause for the USB monitor and the
-  10 s upload window. A battery device would not spend it.
+- **waiting** is only for us: the red blink, the pause for the USB monitor
+  and the 30 s upload window. A battery device would not spend it.
 - `millis()` starts after the bootloader, so the real wake is a little
   longer than printed.
 
@@ -43,7 +46,7 @@ They go on the whiteboard. Part 3 of the lesson starts from them.
   printed after the first wake? Why only after a wake, not on the cold start?
 - Turn the router off and press RESET. What happens on the cold start? Then
   press button A after the router is back.
-- Change `SLEEP_S` to 60 and leave the board for 15 minutes. Compare the
+- Leave the board for 15 minutes. Compare the
   printed time with your phone.
 
 ## Troubleshooting

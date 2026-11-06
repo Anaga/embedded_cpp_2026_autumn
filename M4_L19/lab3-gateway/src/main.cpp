@@ -3,7 +3,9 @@
 // Joins the class router (station), so it listens on the router's
 // channel. Receives NodeMsg packets from the sleeping nodes over ESP-NOW,
 // stamps each one with the local time (NTP) and shows every node on a
-// web page. Runs on the instructor's board and never sleeps.
+// web page. Runs on the instructor's board (Lolin S3 / S3 Mini, or a C3)
+// and never sleeps. The nodes are C3 boards; ESP-NOW does not care which
+// chip is on the other side.
 //
 // At start it prints what goes on the whiteboard:
 //   CLASS_SSID   the router name (from secrets.h)
@@ -38,7 +40,13 @@ constexpr size_t   MAX_NODES       = 10;
 constexpr size_t   QUEUE_LEN       = 8;
 constexpr int      MAC_LEN         = 6;
 constexpr float    TENTHS          = 10.0f;
-// Many Super Mini boards connect only with reduced TX power (session 18).
+// Many C3 Super Mini boards connect only with reduced TX power (session 18).
+// The S3 boards do not need it.
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+constexpr bool LIMIT_TX_POWER = true;
+#else
+constexpr bool LIMIT_TX_POWER = false;
+#endif
 constexpr wifi_power_t TX_POWER = WIFI_POWER_8_5dBm;
 
 // ---------------------------------------------------------------- queue
@@ -249,7 +257,9 @@ void setup() {
   Serial.println("Lesson 19 - Lab 3 gateway");
 
   WiFi.mode(WIFI_STA);
-  WiFi.setTxPower(TX_POWER);
+  if (LIMIT_TX_POWER) {
+    WiFi.setTxPower(TX_POWER);
+  }
   // Modem sleep turns the radio off between beacons and the gateway
   // misses ESP-NOW packets. A gateway on USB power keeps it on.
   WiFi.setSleep(false);

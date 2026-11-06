@@ -1,7 +1,9 @@
 # Lab 3 gateway - ESP-NOW in, web page out
 
-Runs on the instructor's board during the lesson. Students read it; they
-do not need to run it.
+Runs on the instructor's board during the lesson: a Lolin S3 Mini (default
+env `s3mini`) or a Lolin S3 (env `s3`); a C3 works too (env `c3`). The nodes
+are C3 boards - ESP-NOW does not care which chip is on the other side.
+Students read the code; they do not need to run it.
 
 It joins the class router as a WiFi station, so it listens on the
 router's channel. It receives `NodeMsg` packets from the sleeping nodes,
@@ -11,7 +13,8 @@ stamps them with the local time (NTP) and shows them on a web page.
 
 1. Copy `include/secrets.example.h` to `include/secrets.h`: the class
    router SSID and password.
-2. Build, upload, open the monitor. Write the block it prints on the
+2. Build, upload, open the monitor (`pio run -e s3mini -t upload -t monitor`,
+   or `-e s3` for the big Lolin S3). Write the block it prints on the
    whiteboard:
 
 ```

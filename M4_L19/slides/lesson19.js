@@ -202,7 +202,7 @@ function addFlow(pres, slide, steps, y, h, accentIdx) {
   // ------------------------------------------------------------------ wake sources
   s = T.contentSlide(pres, "Wake Sources on the ESP32-C3", next());
   T.addCode(s, [
-    "constexpr uint64_t SLEEP_US = 20ULL * 1000000ULL;",
+    "constexpr uint64_t SLEEP_US = 60ULL * 1000000ULL;",
     "constexpr uint8_t  PIN_BUTTON = 0;    // button A",
     "",
     "esp_sleep_enable_timer_wakeup(SLEEP_US);",
@@ -256,38 +256,40 @@ function addFlow(pres, slide, steps, y, h, accentIdx) {
     "The PlatformIO monitor reconnects by itself, but may miss the first lines",
     "-> the labs wait SERIAL_WAIT_MS after a wake before printing (only for us, not for a battery)",
     "Upload fails while the board sleeps: there is no port to upload to",
+    "It sleeps on the USB cable too: the chip powers down, the power LED and regulator stay on",
   ], T.MARGIN, T.BODY_TOP, T.CONTENT_W, 2.8, 14);
   T.addCallout(pres, s, "ok", "How to upload to a sleeping board",
-    "Build first. Press RESET or button A: the board stays awake 10 s. Click Upload in that window. " +
+    "Build first. Press RESET or button A: red blink, then blue for 30 s. Click Upload while it is blue. " +
     "Last resort: hold BOOT, press RESET, release BOOT - the board waits for an upload.",
     T.MARGIN, 3.95, T.CONTENT_W, 1.05);
-  notes(s, "The 10 s window after reset or button is a named constant (AWAKE_WINDOW_MS) in every " +
-    "lab. On Windows the port can take longer to come back; that is why 10 s and not 3 s.");
+  notes(s, "The 30 s blue window after a reset or a button press is a named constant in every lab. " +
+    "On Windows the port can take a while to come back; 30 s leaves room to click Upload.");
 
   // ------------------------------------------------------------------ lab 1
   s = T.contentSlide(pres, "Lab 1 - Deep Sleep", next());
   T.addBullets(s, [
     "Open M4_L19/lab1-sleep, build, upload, open the monitor",
-    "Watch: cold start -> 10 s awake -> sleep 20 s -> timer wake",
-    "Press button A while it sleeps: button wake, 10 s awake",
+    "Watch LED and monitor: 30 s awake -> 60 s asleep -> timer wake",
+    "Press button A while it sleeps: button wake",
     "Press RESET: bootCount goes back to 1? Check",
     "Unplug USB and plug back in: bootCount?",
-  ], T.MARGIN, T.BODY_TOP, 4.2, 3.4, 13);
+  ], T.MARGIN, T.BODY_TOP, 4.3, 2.3, 13);
   T.addCode(s, [
-    "#3 wake: timer",
-    "   prev awake 2014 ms",
-    "   sleeping 20 s",
-    "#4 wake: button",
-    "   awake 10 s - upload now",
-    "   prev awake 2011 ms",
-    "   sleeping 20 s",
-  ].join("\n"), 4.9, T.BODY_TOP, 4.6, 2.35, 11, "Serial output (example)");
-  T.addCallout(pres, s, "info", "Where do the 2000 ms come from?",
-    "Almost all of it is SERIAL_WAIT_MS for the USB monitor. The real work takes a few ms.",
-    4.9, 3.95, 4.6, 0.95);
-  notes(s, "15 min. RESET on the C3 is a full chip reset: RTC memory may or may not survive " +
-    "depending on the reset kind - let them find out. A power cycle always clears it. " +
-    "Ask them to change SERIAL_WAIT_MS to 0 and see which lines disappear from the monitor.");
+    "#2 wake: timer",
+    "   prev awake 30302 ms",
+    "   awake 30 s - LED blue, upload now",
+    "   sleeping 60 s - LED green",
+  ].join("\n"), 5.0, T.BODY_TOP, 4.5, 1.5, 11, "Serial output (example)");
+  T.addCards(pres, s, [
+    { title: "Red blink", body: "Just woke up: setup() starts again from the top", accent: T.RED },
+    { title: "Blue", body: "Awake: the COM port works, upload now", accent: "4FC3F7" },
+    { title: "Green", body: "Asleep: the pin is held LOW through deep sleep", accent: T.GREEN },
+  ], 3.55, 1.35);
+  notes(s, "15 min. Point at the LED: the COM port exists only while it is blue. " +
+    "RESET on the C3 is a full chip reset: RTC memory may or may not survive depending on the " +
+    "reset kind - let them find out. A power cycle always clears it. The board sleeps on the USB " +
+    "cable too: the chip powers down, the power LED and the regulator stay on. Ask: a battery " +
+    "device would never keep an LED on in sleep - what would it do with the pins?");
 
   // ------------------------------------------------------------------ PART 2
   s = T.sectionSlide(pres, { kicker: "PART 2", title: "Exact Time", note: "millis() starts at 0 on every wake. The real clock does not." });
@@ -334,16 +336,16 @@ function addFlow(pres, slide, steps, y, h, accentIdx) {
   s = T.contentSlide(pres, "Lab 2 - NTP Once, Then Sleep", next());
   addFlow(pres, s, [
     { title: "Cold start", body: "WiFi on, NTP, WiFi off" },
-    { title: "Sleep 20 s", body: "RTC timer runs" },
+    { title: "Sleep 60 s", body: "RTC timer runs" },
     { title: "Wake", body: "set TZ, print time" },
-    { title: "Sleep 20 s", body: "no WiFi at all" },
+    { title: "Sleep 60 s", body: "no WiFi at all" },
   ], T.BODY_TOP + 0.05, 0.9, [0]);
   T.addCode(s, [
     "   WiFi 1840 ms, NTP 212 ms",
-    "   awake 10 s - upload now",
-    "2026-11-06 19:12:15  #1  cold    awake 2068 ms (+12000 waiting)",
-    "2026-11-06 19:12:37  #2  timer   awake 3 ms (+2000 waiting)",
-    "2026-11-06 19:12:59  #3  timer   awake 3 ms (+2000 waiting)",
+    "   awake 30 s - LED blue, upload now",
+    "2026-11-06 19:12:35  #1  cold    awake 2068 ms (+32300 waiting)",
+    "2026-11-06 19:13:37  #2  timer   awake 3 ms (+2300 waiting)",
+    "2026-11-06 19:14:39  #3  timer   awake 3 ms (+2300 waiting)",
   ].join("\n"), T.MARGIN, 2.25, T.CONTENT_W, 1.75, 11);
   T.addBullets(s, [
     "Copy include/secrets.example.h to secrets.h, class WiFi from the whiteboard",
@@ -467,7 +469,7 @@ function addFlow(pres, slide, steps, y, h, accentIdx) {
   s = T.contentSlide(pres, "The Channel Rule", next());
   addFlow(pres, s, [
     { title: "Node", body: "finds the router's channel by scanning once, keeps it in RTC memory" },
-    { title: "Gateway", body: "joined to the router: its channel is the router's channel" },
+    { title: "Gateway (S3)", body: "Lolin S3 joined to the router: its channel is the router's channel" },
     { title: "Browser", body: "page from the gateway: every node, its last packet and time" },
   ], T.BODY_TOP + 0.05, 1.5, [1]);
   T.addBullets(s, [
@@ -498,7 +500,7 @@ function addFlow(pres, slide, steps, y, h, accentIdx) {
   T.addCallout(pres, s, "info", "Compare with Lab 2",
     "awake_ms on the page vs your cold-start WiFi time. Same job, two ways to get the number out.",
     T.MARGIN, 4.15, T.CONTENT_W, 0.85);
-  notes(s, "The instructor's board runs lab3-gateway on the class router. Write its MAC and the " +
+  notes(s, "The instructor's Lolin S3 runs lab3-gateway on the class router (the nodes are C3). Write its MAC and the " +
     "router SSID on the whiteboard before the lab. 30 min plus 10 min discussion. " +
     "Unplugged gateway: sends FAIL, after 3 fails the node rescans on the next wake.");
 

@@ -10,7 +10,7 @@ ESP-NOW makes the network cheap again.
 | `lab1-sleep/` | deep sleep, timer wake, button wake, RTC memory |
 | `lab2-ntp/` | NTP once on a cold start, exact time on every wake |
 | `lab3-node/` | a sleeping AHT10 node that reports over ESP-NOW |
-| `lab3-gateway/` | the receiving side (runs on the instructor's board): ESP-NOW + WiFi + web page |
+| `lab3-gateway/` | the receiving side (instructor's Lolin S3): ESP-NOW + WiFi + web page |
 | `homework/` | the task: a clock that sleeps (`homework/README.md`) |
 
 ## Before you start
@@ -24,7 +24,9 @@ ESP-NOW makes the network cheap again.
 ## Uploading to a sleeping board
 
 The C3's USB is inside the chip and powers off in deep sleep: no port, no
-upload. Press RESET or button A - the board stays awake 10 s - and click
-Upload in that window. Last resort: hold BOOT, press RESET, release BOOT.
+upload. The RGB LED shows the state in every lab: red blink = woke up,
+blue = awake, green = asleep. Press RESET or button A - the LED turns blue
+for 30 s - and click Upload in that window. Last resort: hold BOOT, press
+RESET, release BOOT.
 
 Details, expected output and troubleshooting: the README in each lab folder.
