@@ -39,8 +39,8 @@ constexpr uint8_t LED_PINS[] = {PIN_LED_R, PIN_LED_G, PIN_LED_B};
 
 // ---------------------------------------------------------------- timing
 constexpr uint64_t US_PER_S           = 1000000ULL;
-constexpr uint64_t SLEEP_S            = 60;
-constexpr uint32_t AWAKE_WINDOW_MS    = 30000;  // blue: time to start an upload
+constexpr uint64_t SLEEP_S            = 15;
+constexpr uint32_t AWAKE_WINDOW_MS    = 3000;  // blue: time to start an upload
 constexpr uint32_t SERIAL_WAIT_MS     = 2000;   // USB comes back after a wake
 constexpr uint32_t RED_BLINK_MS       = 300;
 constexpr uint32_t RELEASE_TIMEOUT_MS = 5000;
@@ -113,6 +113,11 @@ static bool syncTime() {
     configTzTime(TZ_TALLINN, NTP_SERVER);
     struct tm now;
     ok = getLocalTime(&now, NTP_TIMEOUT_MS);   // waits for the first answer
+    Serial.println("Got a time from NTP:");
+    char text[24];
+    strftime(text, sizeof(text), "%Y-%m-%d %H:%M:%S", &now);
+    Serial.println(text);
+
     ntpMs = millis() - t1;
     Serial.printf("   WiFi %lu ms, NTP %lu ms%s\n", static_cast<unsigned long>(wifiMs),
                   static_cast<unsigned long>(ntpMs), ok ? "" : " - no answer");
