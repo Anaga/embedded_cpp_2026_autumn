@@ -10,6 +10,9 @@ Rhythm: one session per week in weeks 35-36 (Wed), two sessions in week 37
 the first session of a week lands on Mon/Wed, the second on Wed/Fri. Exact
 days are agreed with the group week by week.
 
+Fixed from week 44 on: Monday and Friday only. Wednesdays belong to another
+group and another course.
+
 Lesson IDs are per showcase module (M1_L1 = first lesson of module M1).
 Because M4 and M5 interleave in the delivery plan, IDs are not strictly
 sequential in calendar order. Delivery blocks refer to course-program.md.
@@ -40,13 +43,13 @@ selection is decided (open decision 1 in the program).
 | 16 | M4_L16 | 44   | Mon     | S1: STM32 Black Pill, CubeMX and HAL      |
 | 17 | M4_L17 | 44   | Fri     | S1: STM32, the ready-made project         |
 | 18 | M4_L18 | 45   | Mon     | S3: ESP32-C3 WiFi, web server, JSON       |
-| 19 | M4_L19 | 45   | Fri     | S3: ESP-NOW                               |
+| 19 | M4_L19 | 45   | Fri     | S3: Power modes, NTP, ESP-NOW             |
 | 20 | M5_L20 | 46   | Mon     | S3: MQTT and network diagnosis            |
 | 21 | M5_L21 | 46   | Fri     | CAN (TWAI) and bus diagnosis              |
 | 22 | M4_L22 | 47   | Mon     | Z1: Cross-platform comparison             |
 | 23 | M6_L23 | 47   | Fri     | Z2: Final project                         |
 | 24 | M6_L24 | 48   | Mon     | Z2: Final project                         |
-| 25 | M6_L25 | 48   | Fri     | Z2: Final project, demo day (2026-11-25)  |
+| 25 | M6_L25 | 48   | Fri     | Z2: Final project, demo day (2026-11-27)  |
 
 ---
 
@@ -57,8 +60,9 @@ selection is decided (open decision 1 in the program).
 | 37   | Core K1 + K2 complete: toolchain, electronics, docs  |
 | 40   | Core K3 complete: C and C++ fundamentals             |
 | 42   | Core K4 complete: all peripherals and buses, halfway |
-| 45   | Platform optional blocks complete                    |
-| 46   | All taught material complete, project phase begins   |
+| 44   | Optional block S1 (STM32) complete                   |
+| 46   | Connectivity (sessions 18-21) complete               |
+| 47   | Z1 done, final project ideas approved                |
 | 48   | Demo day, course ends                                |
 
 ---
@@ -68,18 +72,18 @@ selection is decided (open decision 1 in the program).
 - Total span: weeks 35-48, just over 13 weeks. The course description says
   9-12 weeks; accepted as-is for this cohort.
 - No Estonian public holidays fall in the Sep - Nov range.
-- Updated 2026-10-31: sessions 1-17 delivered. Rows 1-14 keep the
-  original plan; the real lesson folders are named by session number
-  (M3_L11 .. M3_L15 for K4, M4_L16 and M4_L17 for STM32), and sessions
+- Updated 2026-11-06: sessions 1-18 delivered, session 19 today. Rows
+  1-14 keep the original plan; the real lesson folders are named by session
+  number (M2_L5 .. M2_L10 for K3, M3_L11 .. M3_L15 for K4, M4_L16 and
+  M4_L17 for STM32, M4_L18 and M4_L19 for connectivity), and sessions
   11-15 shifted by one against the rows above after the Pico switch.
   Optional block choice and hour booking: see course-program.md.
-- Slippage buffer: sessions 15-19 (optional blocks). If the group falls
-  behind, drop or shorten an optional block. The core (sessions 1-14) and
-  the closing section (sessions 22-25) are not touched.
-- Session 19 is a half-block slot: 5 optional platform sessions cover 20
-  hours against two full 8-hour blocks. Either S6 (Actuators, 4 h) goes
-  here, or the second session of a chosen block does. Decide together with
-  the optional block selection.
+- Optional blocks as taught (settled 2026-10-31): S1 STM32 in sessions
+  16-17, then connectivity on the ESP32-C3 in sessions 18-21. S6 was not
+  used for the half-block slot; session 19 became the second S3 session
+  and was widened on 2026-11-06 to power modes, NTP and ESP-NOW.
+- Slippage buffer is used up: the closing section (sessions 22-25) is not
+  touched.
 - Release discipline per course-conventions.md: each session's materials
   reach the cohort repository the day of the lesson or the day before,
   never earlier.
