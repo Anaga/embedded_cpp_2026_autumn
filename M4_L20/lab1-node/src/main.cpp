@@ -79,7 +79,7 @@ bool     ledOn          = false;
 uint32_t seq            = 0U;
 uint32_t lastPublishMs  = 0U;
 uint32_t lastAttemptMs  = 0U;
-Link     link           = Link::NoWifi;
+Link     mqtt_link           = Link::NoWifi;
 wl_status_t lastWifi    = WL_IDLE_STATUS;
 
 // Filled by the MQTT callback, handled in loop() - see onMessage().
@@ -207,23 +207,23 @@ void watchWifi() {
 
 void watchMqtt(uint32_t now) {
     if (WiFi.status() != WL_CONNECTED) {
-        link = Link::NoWifi;
+        mqtt_link = Link::NoWifi;
         return;
     }
     if (mqtt.connected()) {
-        link = Link::Online;
+        mqtt_link = Link::Online;
         return;
     }
-    if (link == Link::Online) {
+    if (mqtt_link == Link::Online) {
         const int st = mqtt.state();
         Serial.printf("MQTT: lost the broker, state %d (%s)\n", st, mqttStateText(st));
     }
-    link = Link::NoBroker;
+    mqtt_link = Link::NoBroker;
     // connect() can block for a few seconds, so try at most every 5 s.
     if (lastAttemptMs == 0U || now - lastAttemptMs >= MQTT_RETRY_MS) {
         lastAttemptMs = now;
         if (mqttConnect()) {
-            link = Link::Online;
+            mqtt_link = Link::Online;
         }
     }
 }
@@ -260,18 +260,18 @@ void publishReading() {
 
     char json[JSON_LEN];
     serializeJson(doc, json, sizeof json);
-    if (link == Link::Online) {
+    if (mqtt_link == Link::Online) {
         mqtt.publish(topicAht, json, false);
     }
 
     if (sensorOk) {
         Serial.printf("%s | WiFi %d dBm | %s | %.1f C  %.1f %% | LED %s | seq %lu\n",
-                      nodeId, static_cast<int>(WiFi.RSSI()), linkText(link),
+                      nodeId, static_cast<int>(WiFi.RSSI()), linkText(mqtt_link),
                       static_cast<double>(t), static_cast<double>(rh),
                       ledOn ? "on" : "off", static_cast<unsigned long>(seq));
     } else {
         Serial.printf("%s | WiFi %d dBm | %s | sensor missing | LED %s | seq %lu\n",
-                      nodeId, static_cast<int>(WiFi.RSSI()), linkText(link),
+                      nodeId, static_cast<int>(WiFi.RSSI()), linkText(mqtt_link),
                       ledOn ? "on" : "off", static_cast<unsigned long>(seq));
     }
 }
@@ -324,5 +324,5 @@ void loop() {
         publishReading();
     }
 
-    setChannel(PIN_RED, link != Link::Online);
+    setChannel(PIN_RED, mqtt_link != Link::Online);
 }
