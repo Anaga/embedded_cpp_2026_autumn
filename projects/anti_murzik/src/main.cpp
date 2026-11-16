@@ -19,16 +19,13 @@ AntiMurzikStateMachine fsm;
 
 unsigned long lastHeartbeatMs = 0;
 unsigned long lastSprayMs = 0;
-unsigned long lastPirMs = 0;
 
 // ==================== WiFi Setup ====================
 void setupWiFiAP() {
     WiFi.mode(WIFI_AP);
     WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASSWORD);
     WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET);
-    delay(100); // Allow AP to settle
-    Serial.print("AP IP: ");
-    Serial.println(WiFi.softAPIP());
+    delay(100);
 }
 
 // ==================== Web Handlers ====================
@@ -158,10 +155,6 @@ void handleNotFound() {
 
 // ==================== Setup ====================
 void setup() {
-    Serial.begin(115200);
-    while (!Serial) { delay(10); }
-    Serial.println("=== Anti-Murzik boot ===");
-
     // Hardware init
     motors.init();
     pump.init();
@@ -176,10 +169,6 @@ void setup() {
     server.on("/status", HTTP_GET, handleStatus);
     server.onNotFound(handleNotFound);
     server.begin();
-
-    Serial.println("Web server started");
-    Serial.println("Connect to WiFi: " + String(WIFI_AP_SSID));
-    Serial.println("Open http://192.168.4.1 in browser");
 }
 
 // ==================== Loop ====================
@@ -187,17 +176,6 @@ void loop() {
     server.handleClient();
 
     unsigned long now = millis();
-
-    // Heartbeat: print status every 1s
-    if (now - lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
-        lastHeartbeatMs = now;
-        float dist = distSensor.readDistanceCm();
-        Serial.printf("[HB] state=%s dist=%.1fcm pump=%s uptime=%lus\n",
-                      fsm.getStateName(),
-                      dist,
-                      pump.isSpraying() ? "ON" : "OFF",
-                      now / 1000);
-    }
 
     // Distance sensor periodic read
     distSensor.readDistanceCm();
@@ -207,12 +185,10 @@ void loop() {
         motors.getMotorState() != MotorController::MotorState::STOP) {
         motors.stop();
         fsm.setState(AntiMurzikStateMachine::AntiMurzikState::SAFETY_STOP);
-        Serial.println("[SAFETY] Obstacle detected, stopping!");
     }
 
     // Pump auto-off after spray duration
     if (pump.isSpraying() && (now - lastSprayMs > PUMP_SPRAY_DURATION_MS)) {
         pump.deactivate();
-        Serial.println("[PUMP] Spray complete, deactivating");
     }
 }
