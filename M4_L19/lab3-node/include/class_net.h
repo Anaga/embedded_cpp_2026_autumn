@@ -7,6 +7,5 @@
 #pragma once
 #include <stdint.h>
 
-constexpr const char *CLASS_SSID = "Gamma Intelligence Training";
+constexpr const char *CLASS_SSID = "Gamma Intelligens Training";
 constexpr uint8_t GATEWAY_MAC[6] = {0xCC, 0x8D, 0xA2, 0x8C, 0x88, 0x78};
-// 0xCC, 0x8D, 0xA2, 0x8C, 0x88, 0x78
