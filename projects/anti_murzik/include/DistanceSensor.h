@@ -5,7 +5,7 @@
 
 class DistanceSensor {
 public:
-    enum class DistanceState : uint8 {
+    enum class DistanceState : uint8_t {
         UNKNOWN = 0,
         MEASURING = 1,
         OBSTACLE_DETECTED = 2,

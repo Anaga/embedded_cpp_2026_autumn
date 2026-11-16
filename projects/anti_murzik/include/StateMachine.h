@@ -5,7 +5,7 @@
 
 class AntiMurzikStateMachine {
 public:
-    enum class AntiMurzikState : uint8 {
+    enum class AntiMurzikState : uint8_t {
         IDLE = 0,
         MANUAL_CONTROL = 1,
         AUTONOMOUS_PATROL = 2,

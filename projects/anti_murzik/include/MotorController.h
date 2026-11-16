@@ -5,7 +5,7 @@
 
 class MotorController {
 public:
-    enum class MotorState : uint8 {
+    enum class MotorState : uint8_t {
         STOP = 0,
         FORWARD = 1,
         BACKWARD = 2,

@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <cstdint>
+
 // ==================== WiFi Configuration ====================
 const char* WIFI_AP_SSID = "AntiMurzik_AP";
 const char* WIFI_AP_PASSWORD = "anti1234";

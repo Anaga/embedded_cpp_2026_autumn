@@ -5,7 +5,7 @@
 
 class WaterPump {
 public:
-    enum class PumpState : uint8 {
+    enum class PumpState : uint8_t {
         OFF = 0,
         SPRAYING = 1,
         STANDBY = 2
