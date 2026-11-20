@@ -1,0 +1,19 @@
+# PlatformIO build artifacts
+.pio/
+*.o
+*.elf
+*.hex
+*.bin
+*.map
+*.lib
+
+# Local files
+local.ini
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
