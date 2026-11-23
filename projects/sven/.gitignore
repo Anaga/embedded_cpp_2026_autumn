@@ -1,0 +1,15 @@
+# PlatformIO build output and downloaded dependencies
+/.pio/
+
+# CLion local project settings
+/.idea/
+
+# CMake build directories and local configuration
+/cmake-build-*/
+/build/
+/CMakeUserPresets.json
+/compile_commands.json
+
+# macOS metadata
+.DS_Store
+._*
