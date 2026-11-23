@@ -83,3 +83,4 @@ cmake-build-*/
 .tmp.driveupload/
 
 M4_L19/lab3-node/include/secret.h
+projects/vahur/WIRING_AND_TEST.md
