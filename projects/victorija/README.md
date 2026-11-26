@@ -1,15 +1,17 @@
 # Winter Guardian
 
-A battery and tamper monitor for a motorcycle parked over the winter. A sleeping node under the seat measures battery voltage, temperature, humidity and movement, and sends one LoRa packet every 20 s (demo interval). A gateway at home receives it, raises alarms and reports to a Telegram bot.
+A battery and tamper monitor for a motorcycle parked over the winter. A sleeping node under the seat measures battery voltage, temperature, humidity and movement, and sends one LoRa packet every 20 s (demo interval; 10 min for real use). A gateway at home receives it, raises alarms, shows the most important one on its LED and reports to a Telegram bot.
 
 ## Hardware
 
 | Part | Node (bike) | Gateway (home) |
 |---|---|---|
 | Board | ESP32-C3 Super Mini | ESP32-S3-DevKitC-1U |
-| Radio | Ra-01 (SX1278, 433 MHz) | Ra-01 |
+| Radio | Ra-01 (SX1278, 433 MHz), spring antenna | Ra-01 |
 | Sensors | AHT10 (I2C 0x38), MPU-6050 / GY-521 (I2C 0x68), 100k/10k battery divider | - |
-| Power | 12 V -> Mean Well N7803-1PV -> 3V3 (bench: USB) | USB |
+| Power | USB (demo); later 12 V through a 3.3 V regulator | USB |
+
+The node exists twice: the first on a breadboard, the second soldered onto a 4 x 6 cm protoboard (same pins, same firmware) to fit under the seat.
 
 ## Layout
 
@@ -39,7 +41,7 @@ Gateway (ESP32-S3):
 | Function | GPIO |
 |---|---|
 | LoRa SCK / MISO / MOSI / NSS / RST / DIO0 | 12 / 13 / 11 / 10 / 9 / 14 |
-| On-board RGB LED | 38 |
+| On-board RGB LED (WS2812) | 38 |
 
 All modules run on 3.3 V.
 
@@ -47,47 +49,58 @@ All modules run on 3.3 V.
 
 ```
 cd node && pio run -t upload
-cd gateway && cp include/secrets.h.example include/secrets.h   # fill in WiFi, bot token, chat id
+cd gateway && cp include/secrets.h.example include/secrets.h   # fill in bot token, chat id
 pio run -t upload && pio device monitor
+wifi add "<ssid>" <password>     # typed in the monitor, once per network, then: reboot
 ```
+
+WiFi networks are saved in NVS (up to 5); the gateway joins the strongest one it sees. `wifi_store.*`, `console.*` and `loop_stats.h` come from lesson 24.
 
 The node prints only on a cold start. After that, watch the gateway's serial output or the bot.
 
-## How it works
+## Node
 
-Node, one cycle per wake, all in `setup()`:
+One cycle per wake, all in `setup()`:
 
 1. Wake cause: timer, GPIO 1 (motion) or cold start.
-2. Battery: 64 ADC samples, trimmed mean, two-point calibration.
+2. Battery (`battery.h`): 64 ADC samples, trimmed mean, two-point calibration.
 3. AHT10 read. MPU-6050 motion wake configured on cold start only; it keeps its settings through the C3's deep sleep.
-4. One 23-byte `GuardianMsg` over LoRa (SF9, 10 dBm, ~205 ms air time).
+4. One 23-byte `GuardianMsg` over LoRa (SF9, 10 dBm, about 205 ms air time).
 5. `LoRa.sleep()`, NSS held high, deep sleep 20 s. Awake time is about 0.41 s.
 
-The counter and the tamper cooldown live in `RTC_DATA_ATTR`. At most one TAMPER is sent per 2 min; during the cooldown the motion wake is disabled.
+The counter and the tamper cooldown live in `RTC_DATA_ATTR`. During the cooldown the motion wake is disabled, so a bike being pushed around doesn't wake the node continuously.
 
-Gateway:
+## Gateway
 
-- `loop()`, core 1: radio only. It validates size, magic and version, counts lost packets from gaps in `seq`, checks alarms and stores history.
-- `botTask`, core 0: WiFi, NTP, Telegram over HTTPS with certificate check. It answers only `CHAT_ID`.
-- Shared state: a copy under a mutex (`latestLock`). Alerts go through a FreeRTOS queue.
+Built the lesson 24 way: one class per part, each with `begin()` and `update(now)`; `loop()` only calls them in turn, and no part waits. WiFi and Telegram must wait, so they run in their own task on core 0. The parts are listed at the top of `gateway/src/main.cpp`; every tunable number is in `config.h`.
 
-Alarms are ON/OFF. `setAlarm()` calls `notify()` only on a change, so there is one message when an alarm starts and one when it clears.
+| File | Part |
+|---|---|
+| `receiver.*` | reads a packet, checks size, magic and version, counts lost packets from gaps in `seq` |
+| `alarms.*` | the alarm states, start/clear messages with advice |
+| `history.*` | ring buffer of 2000 entries, its own mutex; `/history` averages it into about 12 rows |
+| `status_led.*` | the most important problem as a colour (movement, battery, condensation, system fault, all OK) |
+| `net.*` | the net task: WiFi, NTP, Telegram over HTTPS with certificate check; answers only `CHAT_ID` |
+| `shared.*` | what `loop()` and the net task share: a mutex-protected copy of the latest reading, the alert queue |
+| `format.*`, `emoji.h` | text helpers; emoji as UTF-8 escapes so the sources stay ASCII |
+
+Alarms are ON/OFF and send one message when they start and one when they clear.
 
 | Alarm | On | Off |
 |---|---|---|
 | Battery low / critical | < 12.2 V / < 11.8 V | +0.1 V hysteresis |
-| Movement | TAMPER flag | 2 min without movement |
-| Node silent | 60 s without a packet | next packet |
-| Temperature sensor | AHT10 missing, or a jump > 10 C between packets | plausible reading |
+| Movement | TAMPER flag | 10 s without movement (demo; real: 2 min) |
+| Node silent | 3 reports missed | next packet |
+| Condensation risk | > 85 %RH | < 80 %RH |
+| Temperature sensor | AHT10 missing, outside -40...+60 C, or a jump > 10 C | plausible reading |
 | Motion sensor | MPU-6050 missing | answers again |
+| Battery reading | below 3 V or above 16 V (divider not connected) | plausible reading |
 
-The temperature jump check exists because an AHT10 that loses VCC still answers through the I2C pull-ups, with readings around 50 C too high.
+The temperature checks exist because an AHT10 that loses VCC still answers through the I2C pull-ups, with readings around 50 C too high.
 
-Bot commands:
-- `/status`: the latest reading and the active alarms.
-- `/history [hours]`: from a ring buffer of 2000 entries, averaged into about 12 rows.
+Alerts are queued while the gateway is offline and sent when it reconnects.
 
-The history is in RAM, so a gateway restart clears it.
+Bot: a status card with buttons (Status, History, Mute), and the commands `/status`, `/history [hours]`, `/mute`, `/unmute`. The history is in RAM, so a gateway restart clears it.
 
 ## Course lessons used
 
@@ -95,26 +108,28 @@ The history is in RAM, so a gateway restart clears it.
 |---|---|
 | 6 Functions, bits | `FLAG_*` bit masks in `msg.h`, flag tests everywhere |
 | 7 Pointers, arrays, strings | `char name[9]` + `copyName()`, `hist[]` ring buffer, `LoRa.write((const uint8_t*)&msg, ...)` |
-| 8 Structs, classes | `GuardianMsg`, `HistEntry`, `Latest`; `Aht10` and `Mpu6050` classes |
+| 8 Structs, classes | `GuardianMsg`, `HistEntry`, `Latest`; classes `Aht10`, `Mpu6050`, `Battery`, `Alarms`, `History`, `StatusLed`, `Receiver` |
 | 9 References | `read(float& t, float& h)`, `begin(TwoWire& wire = Wire)`, `const GuardianMsg&` parameters |
-| 10 States, ring buffer, interrupts | alarm ON/OFF states, ring buffer history, `volatile` shared flags, MPU-6050 INT as a wake source |
+| 10 States, ring buffer, interrupts | alarm ON/OFF states (`enum class Alarm`), ring buffer history, `volatile` shared flags, MPU-6050 INT as a wake source |
 | 13 I2C, AHT10 | `aht10.h` and `mpu6050.h` written without libraries (commands, registers, repeated start) |
 | 14 SPI | Ra-01 over SPI; NSS held high through deep sleep |
-| 18 WiFi | gateway WiFi STA, reconnect loop |
+| 18 WiFi | gateway WiFi STA, reconnect every 5 s, alerts queued while offline |
 | 19 Sleep, NTP, node/gateway | deep sleep, timer and GPIO wake, `RTC_DATA_ATTR`, NTP with time zone; same node/gateway split as lab 3, with LoRa instead of ESP-NOW |
-| 23 Telegram bot | `/status`, `/history`, alert once per change, `secrets.h` in `.gitignore` |
-| 24 Integration | radio in `loop()`, bot in its own FreeRTOS task, mutex copy for data, queue for alerts |
+| 23 Telegram bot | status card, `/status`, `/history`, `/mute`, reply-keyboard buttons, alert once per change with advice, `secrets.h` in `.gitignore` |
+| 24 Integration | one class per part with `begin()` / `update(now)`, `loop()` is a list of updates, no part waits; WiFi and Telegram in a FreeRTOS task on core 0; mutex copy for shared data, queue for alerts; `LoopStats`; WiFi list in NVS + WiFiMulti, serial console |
 
 ## Measured
 
 - Range: node in a car next to the bike, gateway at a home window: 51/52 packets, RSSI -90 to -95 dBm, SNR +4 to +6 dB.
 - Node awake time: 413 ms per wake (cold start: 2.6 s).
-- Battery after calibration: within +-0.025 V of the reference, 10.97-14.78 V.
+- Battery, breadboard node after calibration: within +-0.025 V of the reference, 10.97-14.78 V.
+- Battery, soldered node, without calibration: 12.005 V at 12.00 V, 14.42 V at 14.40 V.
 - History run of 1.7 h: 1 packet lost of 282.
 - Mean Well N7803 no-load current: 5.07 mA.
 
 ## Known problems, next steps
 
-- On the breadboard, powering the node from the Mean Well makes the battery read about 2 V low. The node's current returns through jumper contacts and lifts the C3's ground during the ADC read. On USB the reading is correct. To be redone on the soldered board.
-- The 5 mA idle current of the N7803 would drain the bike battery in about 2 months. Next step: a low-Iq regulator (Pololu D36V6F3).
-- Still to do: power budget per part, AHT10 on a 1 m cable, enclosure, a soldered node.
+- On the breadboard, powering the node from the Mean Well made the battery read about 2 V low: the node's current returned through jumper contacts and lifted the C3's ground during the ADC read. To be redone on the soldered board.
+- The 5 mA idle current of the N7803 would drain the bike battery in about 2 months. Next step: a low-Iq regulator.
+- One Ra-01 pad joint on the soldered node is intermittent (MISO); to be reflowed.
+- Still to do: power budget per part, enclosure, running on the bike's 12 V.
