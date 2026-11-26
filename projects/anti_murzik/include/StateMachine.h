@@ -4,26 +4,30 @@
 #include <Arduino.h>
 
 class AntiMurzikStateMachine {
-public:
-    enum class AntiMurzikState : uint8_t {
-        IDLE = 0,
-        MANUAL_CONTROL = 1,
-        AUTONOMOUS_PATROL = 2,
-        SAFETY_STOP = 3,
-        WATERING = 4
-    };
+ public:
+  enum class AntiMurzikState : uint8_t {
+    IDLE = 0,
+    MANUAL_CONTROL = 1,
+    AUTONOMOUS_PATROL = 2,
+    SAFETY_STOP = 3,
+    WATERING = 4
+  };
 
-    AntiMurzikState getState() const { return currentState_; }
-    void setState(AntiMurzikState newState);
+  AntiMurzikStateMachine();
+  void begin();
+  void update(uint32_t now);
 
-    // Transition logic
-    AntiMurzikState transition(AntiMurzikState from, AntiMurzikState to);
+  AntiMurzikState getState() const;
+  void setState(AntiMurzikState newState);
 
-    // Human-readable state name
-    const char* getStateName() const;
+  // Transition logic
+  AntiMurzikState transition(AntiMurzikState from, AntiMurzikState to);
 
-private:
-    AntiMurzikState currentState_ = AntiMurzikState::IDLE;
+  // Human-readable state name
+  const char* getStateName() const;
+
+ private:
+  AntiMurzikState currentState_;
 };
 
 #endif // STATE_MACHINE_H

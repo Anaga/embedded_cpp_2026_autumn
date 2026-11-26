@@ -3,27 +3,29 @@
 
 #include <Arduino.h>
 
+// HC-SR04 ultrasonic distance sensor - non-blocking
 class DistanceSensor {
-public:
-    enum class DistanceState : uint8_t {
-        UNKNOWN = 0,
-        MEASURING = 1,
-        OBSTACLE_DETECTED = 2,
-        CLEAR = 3
-    };
+ public:
+  enum class DistanceState : uint8_t {
+    UNKNOWN = 0,
+    MEASURING = 1,
+    OBSTACLE_DETECTED = 2,
+    CLEAR = 3
+  };
 
-    DistanceSensor(int trigPin, int echoPin);
-    void init();
-    float readDistanceCm();
-    DistanceState getState() const { return state_; }
-    float getDistanceCm() const { return distanceCm_; }
+  DistanceSensor(int trigPin, int echoPin);
+  void begin();
+  void update(uint32_t now);
+  float readDistanceCm();
 
-private:
-    int trigPin_, echoPin_;
-    DistanceState state_ = DistanceState::UNKNOWN;
-    float distanceCm_ = 0.0;
+  DistanceState getState() const;
+  float getDistanceCm() const;
 
-    unsigned long lastMeasureMs_ = 0;
+ private:
+  int trigPin_, echoPin_;
+  DistanceState state_;
+  float distanceCm_;
+  uint32_t lastMeasure_ = 0;
 };
 
 #endif // DISTANCE_SENSOR_H

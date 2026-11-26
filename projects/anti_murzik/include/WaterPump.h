@@ -2,28 +2,31 @@
 #define WATER_PUMP_H
 
 #include <Arduino.h>
+#include "board.h"
 
 class WaterPump {
-public:
-    enum class PumpState : uint8_t {
-        OFF = 0,
-        SPRAYING = 1,
-        STANDBY = 2
-    };
+ public:
+  enum class PumpState : uint8_t {
+    OFF = 0,
+    SPRAYING = 1,
+    STANDBY = 2
+  };
 
-    WaterPump(int pumpPin);
-    void init();
-    void activate(); // Start spraying
-    void deactivate(); // Stop spraying
-    void setMode(PumpState mode);
-    PumpState getState() const { return state_; }
-    
-    // Is pump currently spraying?
-    bool isSpraying() const { return state_ == PumpState::SPRAYING; }
+  WaterPump();
+  void begin();
+  void update(uint32_t now);
 
-private:
-    int pumpPin_;
-    PumpState state_ = PumpState::OFF;
+  void activate();
+  void deactivate();
+
+  PumpState getState() const;
+  bool isSpraying() const;
+  bool isReady() const;
+
+ private:
+  PumpState state_;
+  uint32_t sprayStart_;
+  bool initialized_;
 };
 
 #endif // WATER_PUMP_H
