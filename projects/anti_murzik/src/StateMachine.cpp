@@ -1,5 +1,17 @@
 #include "StateMachine.h"
 
+AntiMurzikStateMachine::AntiMurzikStateMachine() : currentState_(AntiMurzikState::IDLE) {}
+
+void AntiMurzikStateMachine::begin() {
+    currentState_ = AntiMurzikState::IDLE;
+}
+
+void AntiMurzikStateMachine::update(uint32_t now) {
+    (void)now;
+    // State transitions are triggered by commands via shared::receiveCommand()
+    // This component is passive - transitions come from net/console tasks
+}
+
 void AntiMurzikStateMachine::setState(AntiMurzikState newState) {
     currentState_ = transition(currentState_, newState);
 }

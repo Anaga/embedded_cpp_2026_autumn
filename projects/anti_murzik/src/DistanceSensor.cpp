@@ -1,47 +1,43 @@
 #include "DistanceSensor.h"
 
 DistanceSensor::DistanceSensor(int trigPin, int echoPin)
-    : trigPin_(trigPin), echoPin_(echoPin) {}
+    : trigPin_(trigPin), echoPin_(echoPin),
+      state_(DistanceState::UNKNOWN), distanceCm_(0.0f) {}
 
-void DistanceSensor::init() {
+void DistanceSensor::begin() {
     pinMode(trigPin_, OUTPUT);
     pinMode(echoPin_, INPUT);
     digitalWrite(trigPin_, LOW);
-    state_ = DistanceState::UNKNOWN;
+    lastMeasure_ = 0;
+}
+
+void DistanceSensor::update(uint32_t now) {
+    if (now - lastMeasure_ < 100U) return;  // Read every 100ms
+    lastMeasure_ = now;
+    readDistanceCm();
 }
 
 float DistanceSensor::readDistanceCm() {
-    // Ensure a minimum interval between readings to avoid ultrasonic interference
-    unsigned long now = millis();
-    if (now - lastMeasureMs_ < 60) {
-        return distanceCm_;
-    }
-    lastMeasureMs_ = now;
-    
-    // Trigger pulse 10us
-    digitalWrite(trigPin_, LOW);
-    delayMicroseconds(2);
     digitalWrite(trigPin_, HIGH);
     delayMicroseconds(10);
     digitalWrite(trigPin_, LOW);
-    
-    // Read echo duration (timeout 30ms = ~5m max)
-    long duration = pulseIn(echoPin_, HIGH, 30000);
-    
+
+    uint32_t duration = pulseIn(echoPin_, HIGH, 30000);  // 30ms timeout
     if (duration == 0) {
-        // No echo -> out of range
+        distanceCm_ = -1.0f;
         state_ = DistanceState::UNKNOWN;
-        distanceCm_ = -1.0;
         return distanceCm_;
     }
-    
-    // Speed of sound: 343 m/s -> 0.0343 cm/us
-    distanceCm_ = duration * 0.0343 / 2.0;
-    
-    if (distanceCm_ <= 30.0) {
+
+    distanceCm_ = duration * 0.0343f / 2.0f;  // cm
+
+    if (distanceCm_ > 0 && distanceCm_ < 30.0f) {
         state_ = DistanceState::OBSTACLE_DETECTED;
     } else {
         state_ = DistanceState::CLEAR;
     }
     return distanceCm_;
 }
+
+DistanceSensor::DistanceState DistanceSensor::getState() const { return state_; }
+float DistanceSensor::getDistanceCm() const { return distanceCm_; }
