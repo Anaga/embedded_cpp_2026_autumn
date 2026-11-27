@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="540" viewBox="0 0 1040 540" role="img" aria-labelledby="title desc">
+  <title id="title">Red and green status LED wiring for Sounder</title>
+  <desc id="desc">GPIO27 connects through a 200 ohm resistor to the red LED anode. GPIO26 connects through a separate 200 ohm resistor to the green LED anode. Both cathodes connect to board ground. GPIO18 is unused.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0 L5 2.5 L0 5 Z" fill="#526171"/></marker>
+  </defs>
+  <rect width="1040" height="540" fill="#ffffff"/>
+  <g font-family="Arial, sans-serif" fill="#17202a">
+    <text x="40" y="48" font-size="28" font-weight="bold">Red and green status LEDs</text>
+    <text x="40" y="80" font-size="17" fill="#526171">GPIO27 red · GPIO26 green · 200 Ω (0.2 kΩ) per LED</text>
+    <rect x="40" y="130" width="245" height="290" rx="12" fill="#f7fafc" stroke="#9aa8b5" stroke-width="2"/>
+    <text x="60" y="160" font-size="16" font-weight="bold">Freenove ESP32-WROVER</text>
+    <text x="70" y="213" font-size="20" font-weight="bold">GPIO27</text>
+    <text x="70" y="353" font-size="20" font-weight="bold">GPIO26</text>
+    <text x="400" y="201" font-size="17" text-anchor="middle">200 Ω</text>
+    <text x="400" y="341" font-size="17" text-anchor="middle">200 Ω</text>
+    <text x="560" y="179" font-size="17" font-weight="bold" fill="#bb2430">Red · Bluetooth</text>
+    <text x="560" y="319" font-size="17" font-weight="bold" fill="#18834a">Green · synth voice</text>
+    <text x="545" y="266" font-size="16" text-anchor="end">Anode (+)</text>
+    <text x="600" y="266" font-size="16">Cathode (−)</text>
+    <text x="545" y="406" font-size="16" text-anchor="end">Anode (+)</text>
+    <text x="600" y="406" font-size="16">Cathode (−)</text>
+    <text x="850" y="490" font-size="18" font-weight="bold" text-anchor="middle">Board GND</text>
+    <text x="40" y="527" font-size="16" fill="#526171">One resistor per LED. Both cathodes connect to GND. GPIO18 is free.</text>
+  </g>
+  <g stroke="#17202a" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M185 220 H365 M437 220 H550 M575 220 H850 M185 360 H365 M437 360 H550 M575 360 H850"/>
+    <rect x="365" y="208" width="72" height="24" fill="#ffffff"/>
+    <rect x="365" y="348" width="72" height="24" fill="#ffffff"/>
+    <path d="M550 204 L575 220 L550 236 Z" fill="#f9d3d8"/>
+    <path d="M575 204 V236"/>
+    <path d="M550 344 L575 360 L550 376 Z" fill="#d4efde"/>
+    <path d="M575 344 V376"/>
+    <path d="M850 220 V440 M825 440 H875 M833 450 H867 M842 460 H858"/>
+  </g>
+  <g stroke="#526171" stroke-width="1.6" fill="none" marker-end="url(#arrow)">
+    <path d="M587 207 L603 193 M599 215 L615 201 M587 347 L603 333 M599 355 L615 341"/>
+  </g>
+  <g fill="#17202a"><circle cx="850" cy="220" r="4"/><circle cx="850" cy="360" r="4"/></g>
+</svg>

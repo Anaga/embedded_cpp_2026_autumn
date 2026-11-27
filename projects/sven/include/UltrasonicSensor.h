@@ -38,7 +38,7 @@ public:
         reading_ = {};
         pinMode(triggerPin_, OUTPUT);
         digitalWrite(triggerPin_, LOW);
-        pinMode(echoPin_, INPUT); // External divider provides the pull-down.
+        pinMode(echoPin_, INPUT); // Echo is driven by the module; no internal pull needed.
         attachInterruptArg(echoPin_, onEcho, this, CHANGE);
         begun_ = true;
     }

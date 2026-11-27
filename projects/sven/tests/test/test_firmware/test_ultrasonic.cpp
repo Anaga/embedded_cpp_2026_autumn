@@ -35,17 +35,17 @@ protected:
 };
 
 TEST_F(UltrasonicTest, CapturesPulseWithoutBlockingAndRejectsBusyTrigger) {
-    Sensor sensor(32, 33);
+    Sensor sensor(32, 34);
     EXPECT_FALSE(sensor.trigger());
     sensor.begin();
     EXPECT_EQ(fake_arduino::modes[32], OUTPUT);
-    EXPECT_EQ(fake_arduino::modes[33], INPUT);
+    EXPECT_EQ(fake_arduino::modes[34], INPUT);
     ASSERT_TRUE(sensor.trigger());
     EXPECT_EQ(micros(), 12U);
     EXPECT_EQ(fake_arduino::writes.back().atUs - fake_arduino::writes[2].atUs, 10U);
     EXPECT_FALSE(sensor.trigger());
     EXPECT_FALSE(sensor.poll());
-    echo(33, 1000);
+    echo(34, 1000);
     ASSERT_TRUE(sensor.poll());
     EXPECT_EQ(sensor.reading().status, Status::Valid);
     EXPECT_EQ(sensor.reading().pulseUs, 1000U);
@@ -56,15 +56,15 @@ TEST_F(UltrasonicTest, CapturesPulseWithoutBlockingAndRejectsBusyTrigger) {
 }
 
 TEST_F(UltrasonicTest, MissingAndIncompleteEchoesExpireWithoutReusingDistance) {
-    Sensor sensor(32, 33);
+    Sensor sensor(32, 34);
     sensor.begin();
     sensor.trigger();
-    echo(33, 2000);
+    echo(34, 2000);
     ASSERT_TRUE(sensor.poll());
     EXPECT_EQ(sensor.reading().status, Status::Valid);
     for (bool risingEdge : {false, true}) {
         ASSERT_TRUE(sensor.trigger());
-        if (risingEdge) fake_arduino::edge(33, HIGH);
+        if (risingEdge) fake_arduino::edge(34, HIGH);
         delayMicroseconds(Sensor::kTimeoutUs - 13);
         EXPECT_FALSE(sensor.poll());
         delayMicroseconds(1);
@@ -72,36 +72,36 @@ TEST_F(UltrasonicTest, MissingAndIncompleteEchoesExpireWithoutReusingDistance) {
         EXPECT_EQ(sensor.reading().status, Status::Timeout);
         EXPECT_FLOAT_EQ(sensor.reading().distanceCm, 0);
         EXPECT_EQ(sensor.reading().pulseUs, 0U);
-        fake_arduino::edge(33, LOW);
+        fake_arduino::edge(34, LOW);
         EXPECT_FALSE(sensor.poll());
     }
 }
 
 TEST_F(UltrasonicTest, RejectsStuckHighAndOutOfRangePulses) {
-    Sensor sensor(32, 33);
+    Sensor sensor(32, 34);
     sensor.begin();
-    fake_arduino::edge(33, HIGH);
+    fake_arduino::edge(34, HIGH);
     ASSERT_TRUE(sensor.trigger());
     ASSERT_TRUE(sensor.poll());
     EXPECT_EQ(sensor.reading().status, Status::EchoHigh);
     EXPECT_EQ(triggers(32), 0U);
-    fake_arduino::edge(33, LOW);
+    fake_arduino::edge(34, LOW);
     for (uint32_t pulse : {50U, 27000U}) {
         sensor.trigger();
-        echo(33, pulse);
+        echo(34, pulse);
         ASSERT_TRUE(sensor.poll());
         EXPECT_EQ(sensor.reading().status, Status::OutOfRange);
         EXPECT_EQ(sensor.reading().pulseUs, pulse);
     }
     // An echo arriving after the deadline is ignored even if poll was delayed.
     sensor.trigger();
-    echo(33, 31000);
+    echo(34, 31000);
     ASSERT_TRUE(sensor.poll());
     EXPECT_EQ(sensor.reading().status, Status::Timeout);
 }
 
 TEST_F(UltrasonicTest, TemperatureCompensationAndMicrosRollover) {
-    Sensor sensor(32, 33);
+    Sensor sensor(32, 34);
     sensor.begin();
     EXPECT_TRUE(sensor.setTemperatureC(0));
     EXPECT_FALSE(sensor.setTemperatureC(std::numeric_limits<float>::quiet_NaN()));
@@ -110,7 +110,7 @@ TEST_F(UltrasonicTest, TemperatureCompensationAndMicrosRollover) {
     fake_arduino::now = UINT32_MAX / 1000;
     fake_arduino::microsecondRemainder = UINT32_MAX % 1000 - 200;
     sensor.trigger();
-    echo(33, 1000);
+    echo(34, 1000);
     ASSERT_TRUE(sensor.poll());
     EXPECT_EQ(sensor.reading().status, Status::Valid);
     EXPECT_EQ(sensor.reading().pulseUs, 1000U);
@@ -120,7 +120,7 @@ TEST_F(UltrasonicTest, TemperatureCompensationAndMicrosRollover) {
     EXPECT_TRUE(sensor.poll());
     EXPECT_EQ(sensor.reading().status, Status::Timeout);
     sensor.end();
-    EXPECT_EQ(fake_arduino::interrupts[33].handler, nullptr);
+    EXPECT_EQ(fake_arduino::interrupts[34].handler, nullptr);
     EXPECT_FALSE(sensor.trigger());
 }
 
@@ -129,19 +129,29 @@ TEST_F(UltrasonicTest, AlternatesSensorsAndTracksOnlyValidExtrema) {
     demo.update();
     EXPECT_TRUE(fake_arduino::writes.empty());
     demo.start();
+    EXPECT_EQ(fake_arduino::modes[32], OUTPUT);
+    EXPECT_EQ(fake_arduino::modes[33], OUTPUT);
+    EXPECT_EQ(fake_arduino::modes[34], INPUT);
+    EXPECT_EQ(fake_arduino::modes[35], INPUT);
+    EXPECT_NE(fake_arduino::interrupts[34].handler, nullptr);
+    EXPECT_NE(fake_arduino::interrupts[35].handler, nullptr);
+    EXPECT_EQ(fake_arduino::interrupts[32].handler, nullptr);
+    EXPECT_EQ(fake_arduino::interrupts[33].handler, nullptr);
+    EXPECT_EQ(fake_arduino::interrupts[14].handler, nullptr);
     fake_arduino::now = 199;
     demo.update();
     EXPECT_EQ(triggers(32), 0U);
     fake_arduino::now = 200;
     demo.update();
     EXPECT_EQ(triggers(32), 1U);
-    EXPECT_EQ(triggers(13), 0U);
-    echo(33, 1000);
+    EXPECT_EQ(triggers(33), 0U);
+    echo(34, 1000);
     demo.update();
     EXPECT_EQ(demo.pitchStatistics().valid, 1U);
+    EXPECT_FALSE(demo.pitchHandReading().valid); // Raw diagnostics do not run hand tracking.
     fake_arduino::now = 300;
     demo.update();
-    EXPECT_EQ(triggers(13), 1U);
+    EXPECT_EQ(triggers(33), 1U);
     delayMicroseconds(30000);
     demo.update();
     EXPECT_EQ(demo.volumeStatistics().attempts, 1U);
@@ -149,7 +159,7 @@ TEST_F(UltrasonicTest, AlternatesSensorsAndTracksOnlyValidExtrema) {
     EXPECT_NE(Serial.output.find("volume timeout | echo 0 us | distance n/a"), std::string::npos);
     fake_arduino::now = 400;
     demo.update();
-    echo(33, 2000);
+    echo(34, 2000);
     demo.update();
     EXPECT_EQ(demo.pitchStatistics().attempts, 2U);
     EXPECT_NEAR(demo.pitchStatistics().minCm, 17.171, 0.001);
@@ -158,8 +168,10 @@ TEST_F(UltrasonicTest, AlternatesSensorsAndTracksOnlyValidExtrema) {
     EXPECT_EQ(demo.pitchStatistics().attempts, 0U);
     EXPECT_TRUE(demo.active());
     demo.stop();
-    EXPECT_EQ(fake_arduino::interrupts[33].handler, nullptr);
-    EXPECT_EQ(fake_arduino::interrupts[14].handler, nullptr);
+    EXPECT_EQ(fake_arduino::interrupts[34].handler, nullptr);
+    EXPECT_EQ(fake_arduino::interrupts[35].handler, nullptr);
+    EXPECT_EQ(std::count_if(fake_arduino::writes.begin(), fake_arduino::writes.end(),
+                           [](const auto& write) { return write.pin == 34 || write.pin == 35; }), 0);
     fake_arduino::now = 10000;
     demo.update();
     EXPECT_EQ(triggers(32), 2U);
@@ -180,7 +192,7 @@ TEST_F(UltrasonicTest, SingleSensorAndDelayedLoopsDoNotBurstOrOverlap) {
         EXPECT_NE(Serial.output.find(selection == Demo::Selection::Pitch ? "pitch timeout" : "volume timeout"),
                   std::string::npos);
         EXPECT_EQ(Serial.output.find(selection == Demo::Selection::Pitch ? "volume" : "pitch"), std::string::npos);
-        const uint8_t pin = selection == Demo::Selection::Pitch ? 32 : 13;
+        const uint8_t pin = selection == Demo::Selection::Pitch ? 32 : 33;
         EXPECT_EQ(triggers(pin), 1U);
         fake_arduino::now = 400;
         demo.update();
@@ -189,7 +201,7 @@ TEST_F(UltrasonicTest, SingleSensorAndDelayedLoopsDoNotBurstOrOverlap) {
         demo.update();
         demo.update();
         EXPECT_LE(triggers(pin), 3U);
-        EXPECT_EQ(triggers(pin == 32 ? 13 : 32), 0U);
+        EXPECT_EQ(triggers(pin == 32 ? 33 : 32), 0U);
     }
     // Millisecond rollover must not stall the schedule.
     Demo demo;
@@ -213,7 +225,7 @@ TEST_F(UltrasonicTest, LimitsLoggingWhileCountingEveryAttemptAndExtremum) {
             delayMicroseconds(30000); // A suppressed failure still counts.
         } else {
             const bool pitch = slotMs % 200 == 0;
-            echo(pitch ? 33 : 14, slotMs == 400 ? 2000 : slotMs == 600 ? 500 : 1000);
+            echo(pitch ? 34 : 35, slotMs == 400 ? 2000 : slotMs == 600 ? 500 : 1000);
         }
         demo.update();
         if (slotMs == 200) EXPECT_TRUE(Serial.output.empty()); // Wait for volume before the first line.
@@ -247,33 +259,37 @@ TEST_F(UltrasonicTest, LiveTimingSamplesEachSensorEverySeventyMilliseconds) {
         ASSERT_EQ(demo.measurementIntervalMs(), 70U);
         fake_arduino::now = 199;
         demo.update();
-        EXPECT_EQ(triggers(32) + triggers(13), 0U);
+        EXPECT_EQ(triggers(32) + triggers(33), 0U);
         for (uint32_t slot = 0; slot < 6; ++slot) {
             fake_arduino::now = 200 + 35 * slot;
             fake_arduino::microsecondRemainder = 0;
-            const auto before = triggers(32) + triggers(13);
+            const auto before = triggers(32) + triggers(33);
             demo.update();
             const bool pitch = selection == Demo::Selection::Pitch ||
                 (selection == Demo::Selection::Both && slot % 2 == 0);
             if (selection == Demo::Selection::Both || slot % 2 == 0) {
-                ASSERT_EQ(triggers(32) + triggers(13), before + 1);
-                echo(pitch ? 33 : 14, 1000);
+                ASSERT_EQ(triggers(32) + triggers(33), before + 1);
+                echo(pitch ? 34 : 35, 1000);
                 demo.update();
             } else {
-                EXPECT_EQ(triggers(32) + triggers(13), before);
+                EXPECT_EQ(triggers(32) + triggers(33), before);
             }
             // Finishing early does not permit a second ping before the slot.
             fake_arduino::now = 200 + 35 * slot + 34;
             demo.update();
-            EXPECT_EQ(triggers(32) + triggers(13), before +
+            EXPECT_EQ(triggers(32) + triggers(33), before +
                       (selection == Demo::Selection::Both || slot % 2 == 0 ? 1 : 0));
         }
         EXPECT_EQ(triggers(32), selection == Demo::Selection::Volume ? 0U : 3U);
-        EXPECT_EQ(triggers(13), selection == Demo::Selection::Pitch ? 0U : 3U);
+        EXPECT_EQ(triggers(33), selection == Demo::Selection::Pitch ? 0U : 3U);
+        EXPECT_EQ(demo.pitchHandReading().valid, selection != Demo::Selection::Volume);
+        EXPECT_EQ(demo.volumeHandReading().valid, selection != Demo::Selection::Pitch);
         demo.handleCommand("sensors", "status", nullptr);
         EXPECT_NE(Serial.output.find("70 ms/sensor"), std::string::npos);
         demo.start(); // Diagnostic commands restore the conservative schedule.
         EXPECT_EQ(demo.measurementIntervalMs(), 200U);
+        EXPECT_FALSE(demo.pitchHandReading().valid);
+        EXPECT_FALSE(demo.volumeHandReading().valid);
     }
 }
 } // namespace

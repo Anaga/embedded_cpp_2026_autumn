@@ -25,7 +25,7 @@ const std::string kIdleStatus =
     "JBL Flip 4 | disconnected | audio stopped | idle | synth sine | target 0.0 Hz | level 35.0% | drive 0.0% | 44100 Hz/stereo/16-bit\n";
 const std::string kHelp =
     "\nSounder | Bluetooth audio | target JBL Flip 4\n"
-    "Put the speaker in pairing mode. Playback stays silent until commanded.\n"
+    "Put the speaker in pairing mode. Theremin starts automatically when audio streams.\n"
     "  demo             Complete tour once (~45 seconds)\n"
     "  showcase         Play every demo on each synth voice\n"
     "  1 scale     C major: C4 to C5 and back\n"
@@ -40,6 +40,7 @@ const std::string kHelp =
     "  tone 440 [1500]  100..8000 Hz; optional duration 10..30000 ms\n"
     "  note 69          MIDI note 45..119; 69 = 440 Hz\n"
     "  synth [voice]    Set or show voice (sine, triangle, pulse, fm, organ)\n"
+    "  GPIO25 button    Click: unmute or next synth; hold 3 seconds: mute/unmute\n"
     "  volume [0..100]  Set/query PCM amplitude; default 35%; 0 mutes\n"
     "  level 0..100     Alias for setting volume\n"
     "  stop / !         Silence and discard pending playback\n"
@@ -53,13 +54,17 @@ const std::string kHelp =
 class FirmwareTest : public testing::Test {
 protected:
     void SetUp() override { reset(); }
-    void TearDown() override { EXPECT_EQ(fake_rtos::lockDepth, 0); }
+    void TearDown() override { statusLeds.end(); EXPECT_EQ(fake_rtos::lockDepth, 0); }
 
     void reset(bool connected = false) {
         sensors.stop();
+        statusLeds.~StatusLeds();
+        new (&statusLeds) sounder::StatusLeds();
         sensors.~UltrasonicDemo();
         new (&sensors) sounder::UltrasonicDemo();
         theremin = {};
+        thereminStartup = {};
+        synthButton = sounder::SynthButton();
         fake_arduino::now = 0;
         fake_arduino::resetGpio();
         fake_arduino::delays.clear();
@@ -119,6 +124,36 @@ protected:
         fake_arduino::now = atMs - 35;
         loop(); // Leave the alternate live scheduling slot quiet.
         sensorEcho(atMs, echoPin, pulseUs);
+    }
+
+    void pressSynthButton() {
+        updateSynthButton(); // Observe the released state before a new press.
+        fake_arduino::edge(25, LOW);
+        loop();
+        fake_arduino::now += sounder::SynthButton::kDebounceMs;
+        loop();
+        fake_arduino::edge(25, HIGH);
+        loop();
+        fake_arduino::now += sounder::SynthButton::kDebounceMs;
+        loop();
+    }
+
+    void holdSynthButton() {
+        updateSynthButton();
+        fake_arduino::edge(25, LOW);
+        loop();
+        fake_arduino::now += sounder::SynthButton::kDebounceMs;
+        loop();
+        fake_arduino::now += sounder::SynthButton::kLongPressMs;
+        loop();
+        fake_arduino::edge(25, HIGH);
+        loop();
+        fake_arduino::now += sounder::SynthButton::kDebounceMs;
+        loop();
+    }
+
+    static std::array<uint8_t, 2> ledLevels() {
+        return {fake_arduino::levels[27], fake_arduino::levels[26]};
     }
 };
 
@@ -337,6 +372,52 @@ TEST(PlaybackTest, Status) {
     EXPECT_FLOAT_EQ(player.status().drive, 1);
 }
 
+TEST(PlaybackTest, MutePreservesPhaseTimeVoiceAndVolumeAcrossEverySynth) {
+    for (const auto& option : sounder::kSynthOptions) {
+        SCOPED_TRACE(option.name);
+        Oscillator osc, referenceOsc;
+        Synth synth(osc, sounder::kSampleRate), referenceSynth(referenceOsc, sounder::kSampleRate);
+        Player player(synth), reference(referenceSynth);
+        player.setVoice(option.voice);
+        reference.setVoice(option.voice);
+        player.startTone(440);
+        reference.startTone(440);
+        for (unsigned i = 0; i < 128; ++i) EXPECT_EQ(player.nextSample(), reference.nextSample());
+        player.setMuted(true);
+        player.setLevel(65);
+        reference.setLevel(65);
+        for (unsigned i = 0; i < 4410; ++i) {
+            player.setMuted(true); // Repeated buffer updates must not alter playback.
+            EXPECT_EQ(player.nextSample(), 0);
+            reference.nextSample();
+        }
+        EXPECT_EQ(player.timeMs(), reference.timeMs());
+        EXPECT_EQ(player.status().mode, Mode::Tone);
+        EXPECT_EQ(player.status().voice, option.voice);
+        EXPECT_FLOAT_EQ(player.status().drive, 1);
+        player.setMuted(false);
+        bool audible = false;
+        for (unsigned i = 0; i < 128; ++i) {
+            const auto sample = player.nextSample();
+            EXPECT_EQ(sample, reference.nextSample());
+            audible = audible || sample != 0;
+        }
+        EXPECT_TRUE(audible);
+    }
+}
+
+TEST(PlaybackTest, MutedFiniteToneStillFinishesAndDoesNotRestartOnUnmute) {
+    Oscillator osc;
+    Synth synth(osc, sounder::kSampleRate);
+    Player player(synth);
+    player.setMuted(true);
+    player.startTone(440, 10);
+    for (unsigned i = 0; i < 882; ++i) EXPECT_EQ(player.nextSample(), 0);
+    EXPECT_EQ(player.status().mode, Mode::Idle);
+    player.setMuted(false);
+    for (unsigned i = 0; i < 128; ++i) EXPECT_EQ(player.nextSample(), 0);
+}
+
 TEST(PlaybackTest, TimeMs) {
     Oscillator osc;
     Synth synth(osc, sounder::kSampleRate);
@@ -533,6 +614,388 @@ TEST_F(FirmwareTest, SwitchSynthDuringTour) {
         EXPECT_FLOAT_EQ(oscillator.hz, sounder::midiToHz(62));
         EXPECT_EQ(shared.playback.mode, Mode::Tour);
     }
+}
+
+TEST_F(FirmwareTest, ButtonCyclesEveryVoiceAndSharesSerialSelectionBeforeConnecting) {
+    setup();
+    Serial.connected = true;
+    greetingShown = true;
+    reportProgress();
+    Serial.output.clear();
+    const sounder::SynthVoice expected[] = {sounder::SynthVoice::Triangle, sounder::SynthVoice::Pulse,
+        sounder::SynthVoice::Fm, sounder::SynthVoice::Organ, sounder::SynthVoice::Sine};
+    for (const auto voice : expected) {
+        pressSynthButton();
+        EXPECT_EQ(shared.voice, voice);
+        EXPECT_EQ(Serial.output, std::string("Synth ") + synthName(voice) + ".\n");
+        EXPECT_EQ(shared.theremin, ThereminMode::Off);
+        EXPECT_FALSE(sensors.active());
+        Serial.output.clear();
+    }
+    command("synth pulse");
+    pressSynthButton();
+    EXPECT_EQ(shared.voice, sounder::SynthVoice::Fm);
+    onConnection(ESP_A2D_CONNECTION_STATE_CONNECTED, nullptr);
+    onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+    loop();
+    EXPECT_EQ(shared.theremin, ThereminMode::Both);
+    EXPECT_EQ(shared.voice, sounder::SynthVoice::Fm);
+}
+
+TEST_F(FirmwareTest, ShortClickUnmutesSameVoiceThenNextClickCyclesWhileUnmuted) {
+    for (bool connected : {false, true}) {
+        for (const auto& option : sounder::kSynthOptions) {
+            SCOPED_TRACE(connected);
+            SCOPED_TRACE(option.name);
+            reset(connected);
+            if (!connected) setup();
+            Serial.connected = true;
+            greetingShown = true;
+            reportProgress();
+            command(std::string("synth ") + option.name);
+            command("volume 20");
+            if (connected) {
+                command("tone 440");
+                render(128);
+            }
+            holdSynthButton();
+            ASSERT_TRUE(shared.muted);
+            const auto generation = shared.generation;
+            Serial.output.clear();
+            pressSynthButton();
+            EXPECT_FALSE(shared.muted);
+            EXPECT_EQ(shared.voice, option.voice);
+            EXPECT_EQ(shared.generation, generation);
+            EXPECT_FLOAT_EQ(shared.level, 20);
+            EXPECT_EQ(Serial.output, "Sound on.\n");
+            if (connected) {
+                const auto audio = render(128);
+                EXPECT_TRUE(std::any_of(audio.begin(), audio.end(), [](const auto& f) { return f.channel1 != 0; }));
+            }
+            Serial.output.clear();
+            pressSynthButton();
+            const auto next = sounder::SynthButton::nextVoice(option.voice);
+            EXPECT_FALSE(shared.muted);
+            EXPECT_EQ(shared.voice, next);
+            EXPECT_EQ(shared.generation, generation);
+            EXPECT_EQ(Serial.output, std::string("Synth ") + synthName(next) + ".\n");
+        }
+    }
+}
+
+TEST_F(FirmwareTest, LongButtonHoldMutesOnceAndRestoresLiveSoundWithoutChangingVoice) {
+    reset(true);
+    Serial.connected = true;
+    greetingShown = true;
+    loop();
+    command("volume 20");
+    sensorEcho(200, 34, 1000);
+    sensorEcho(235, 35, 1600);
+    render(4410);
+    ASSERT_TRUE(shared.playback.live);
+    const auto generation = shared.generation;
+    const auto target = shared.liveTarget;
+    const auto sampleTime = playback.timeMs();
+    const auto pressedAtMs = fake_arduino::now;
+    fake_arduino::edge(25, LOW);
+    loop();
+    fake_arduino::now = pressedAtMs + 30;
+    loop();
+    EXPECT_FALSE(shared.muted);
+    EXPECT_EQ(shared.voice, sounder::SynthVoice::Sine);
+    fake_arduino::now = pressedAtMs + 2999;
+    loop();
+    EXPECT_FALSE(shared.muted);
+    Serial.output.clear();
+    fake_arduino::now = pressedAtMs + 3000;
+    loop();
+    EXPECT_TRUE(shared.muted);
+    EXPECT_EQ(Serial.output, "Sound muted.\n");
+    for (const auto& frame : render(2205)) {
+        EXPECT_EQ(frame.channel1, 0);
+        EXPECT_EQ(frame.channel2, 0);
+    }
+    EXPECT_EQ(playback.timeMs(), sampleTime + 50);
+    EXPECT_TRUE(shared.playback.live);
+    fake_arduino::now = pressedAtMs + 10000;
+    Serial.output.clear();
+    loop();
+    EXPECT_TRUE(shared.muted);
+    EXPECT_EQ(Serial.output.find("Sound "), std::string::npos);
+    fake_arduino::edge(25, HIGH);
+    loop();
+    fake_arduino::now += 30;
+    loop();
+    EXPECT_TRUE(shared.muted);
+    EXPECT_EQ(shared.voice, sounder::SynthVoice::Sine);
+    EXPECT_EQ(shared.generation, generation);
+    EXPECT_EQ(shared.theremin, ThereminMode::Both);
+    EXPECT_FLOAT_EQ(shared.liveTarget.hz, target.hz);
+    EXPECT_FLOAT_EQ(shared.liveTarget.drive, target.drive);
+    EXPECT_FLOAT_EQ(shared.level, 20);
+    Serial.output.clear();
+    holdSynthButton();
+    EXPECT_FALSE(shared.muted);
+    EXPECT_EQ(Serial.output.find("Sound on.\n"), 0U);
+    EXPECT_EQ(Serial.output.find("Sound on.\n", 1), std::string::npos);
+    EXPECT_EQ(Serial.output.find("Synth "), std::string::npos);
+    EXPECT_EQ(shared.generation, generation);
+    EXPECT_EQ(shared.voice, sounder::SynthVoice::Sine);
+    EXPECT_EQ(shared.theremin, ThereminMode::Both);
+    const auto audio = render(4410);
+    EXPECT_TRUE(std::any_of(audio.begin(), audio.end(), [](const auto& f) { return f.channel1 != 0; }));
+    EXPECT_FLOAT_EQ(shared.level, 20);
+    pressSynthButton();
+    EXPECT_EQ(shared.voice, sounder::SynthVoice::Triangle);
+    EXPECT_FALSE(shared.muted);
+}
+
+TEST_F(FirmwareTest, ButtonMuteBeforeConnectionPreservesAutomaticStartupAndMasterVolume) {
+    setup();
+    holdSynthButton();
+    ASSERT_TRUE(shared.muted);
+    command("volume 65");
+    command("synth pulse");
+    onConnection(ESP_A2D_CONNECTION_STATE_CONNECTED, nullptr);
+    onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+    loop();
+    EXPECT_EQ(shared.theremin, ThereminMode::Both);
+    const auto atMs = fake_arduino::now + 200;
+    sensorEcho(atMs, 34, 1000);
+    sensorEcho(atMs + 35, 35, 1600);
+    for (const auto& frame : render(4410)) EXPECT_EQ(frame.channel1, 0);
+    EXPECT_TRUE(shared.playback.live);
+    pressSynthButton();
+    EXPECT_FALSE(shared.muted);
+    EXPECT_FLOAT_EQ(shared.level, 65);
+    EXPECT_EQ(shared.voice, sounder::SynthVoice::Pulse);
+    const auto audio = render(4410);
+    EXPECT_TRUE(std::any_of(audio.begin(), audio.end(), [](const auto& f) { return f.channel1 != 0; }));
+}
+
+TEST_F(FirmwareTest, ButtonUnmuteDoesNotRestartPlaybackStoppedByCommandsOrBluetooth) {
+    for (int interruption : {0, 1, 2}) {
+        SCOPED_TRACE(interruption);
+        reset(true);
+        command("tone 440");
+        render(128);
+        holdSynthButton();
+        ASSERT_TRUE(shared.muted);
+        if (interruption == 1) {
+            onConnection(ESP_A2D_CONNECTION_STATE_DISCONNECTED, nullptr);
+            onConnection(ESP_A2D_CONNECTION_STATE_CONNECTED, nullptr);
+            onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+        } else if (interruption == 2) {
+            onAudio(ESP_A2D_AUDIO_STATE_REMOTE_SUSPEND, nullptr);
+            onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+        } else {
+            command("stop");
+        }
+        render(128);
+        pressSynthButton();
+        EXPECT_FALSE(shared.muted);
+        EXPECT_EQ(shared.theremin, ThereminMode::Off);
+        for (const auto& frame : render(128)) EXPECT_EQ(frame.channel1, 0);
+        EXPECT_EQ(shared.playback.mode, Mode::Idle);
+    }
+}
+
+TEST_F(FirmwareTest, SerialPlaybackAndVolumeChangesRespectButtonMute) {
+    reset(true);
+    command("tone 440");
+    render(128);
+    holdSynthButton();
+    command("tone 660");
+    command("volume 80");
+    for (const auto& frame : render(4410)) EXPECT_EQ(frame.channel1, 0);
+    EXPECT_TRUE(shared.muted);
+    EXPECT_FLOAT_EQ(shared.playback.hz, 660);
+    Serial.output.clear();
+    command("status");
+    EXPECT_NE(Serial.output.find("muted/tone"), std::string::npos);
+    EXPECT_NE(Serial.output.find("level 80.0% | drive 0.0%"), std::string::npos);
+    holdSynthButton();
+    const auto audio = render(4410);
+    EXPECT_TRUE(std::any_of(audio.begin(), audio.end(), [](const auto& f) { return f.channel1 != 0; }));
+    EXPECT_FLOAT_EQ(shared.level, 80);
+    EXPECT_FLOAT_EQ(shared.playback.hz, 660);
+}
+
+TEST_F(FirmwareTest, ButtonRemainsAvailableAfterAudioInitializationFailure) {
+    for (bool queueFails : {false, true}) {
+        SCOPED_TRACE(queueFails);
+        reset();
+        fake_rtos::queueFails = queueFails;
+        fake_audio::beginFails = !queueFails;
+        setup();
+        pressSynthButton();
+        EXPECT_EQ(shared.voice, sounder::SynthVoice::Triangle);
+        EXPECT_FALSE(audioReady);
+        EXPECT_EQ(shared.theremin, ThereminMode::Off);
+        EXPECT_FALSE(sensors.active());
+    }
+}
+
+TEST_F(FirmwareTest, ButtonHeldDuringBootPreservesAutomaticThereminStartup) {
+    setup();
+    fake_arduino::edge(25, LOW);
+    fake_arduino::now = 2000;
+    onConnection(ESP_A2D_CONNECTION_STATE_CONNECTED, nullptr);
+    onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+    loop();
+    ASSERT_EQ(shared.theremin, ThereminMode::Both);
+    const auto generation = shared.generation;
+    fake_arduino::now = 5000;
+    loop();
+    EXPECT_EQ(shared.theremin, ThereminMode::Both);
+    EXPECT_EQ(shared.generation, generation);
+    EXPECT_EQ(shared.voice, sounder::SynthVoice::Sine);
+    EXPECT_FALSE(shared.muted);
+    fake_arduino::edge(25, HIGH);
+    loop();
+    fake_arduino::now += 30;
+    loop();
+    pressSynthButton();
+    EXPECT_EQ(shared.voice, sounder::SynthVoice::Triangle);
+    EXPECT_EQ(shared.theremin, ThereminMode::Both);
+    EXPECT_EQ(shared.generation, generation);
+}
+
+TEST_F(FirmwareTest, StatusLedsFollowButtonAndSerialWithoutChangingPlayback) {
+    reset(true);
+    command("tone 440");
+    render(4410);
+    loop();
+    EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{LOW, HIGH}));
+    const auto generation = shared.generation;
+    pressSynthButton();
+    EXPECT_EQ(shared.voice, sounder::SynthVoice::Triangle);
+    EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{LOW, HIGH}));
+    fake_arduino::now += 500;
+    loop();
+    EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{LOW, LOW}));
+    command("synth pulse");
+    const auto pulseAtMs = fake_arduino::now;
+    loop();
+    EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{LOW, HIGH}));
+    fake_arduino::now = pulseAtMs + 250;
+    loop();
+    EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{LOW, LOW}));
+    const auto audio = render(4410);
+    EXPECT_EQ(shared.generation, generation);
+    EXPECT_EQ(shared.playback.mode, Mode::Tone);
+    EXPECT_EQ(shared.playback.voice, sounder::SynthVoice::Pulse);
+    EXPECT_FLOAT_EQ(shared.playback.hz, 440);
+    EXPECT_FLOAT_EQ(shared.level, 35);
+    EXPECT_TRUE(std::any_of(audio.begin(), audio.end(), [](const auto& f) { return f.channel1 != 0; }));
+    command("stop");
+    fake_arduino::now = pulseAtMs + 500;
+    loop();
+    EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{LOW, HIGH}));
+    for (const auto& frame : render(128)) EXPECT_EQ(frame.channel1, 0);
+}
+
+TEST_F(FirmwareTest, StatusLedsAreVisibleBeforeBluetoothInitializationWithoutSerial) {
+    EXPECT_FALSE(Serial);
+    source.beforeStart = [] {
+        EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{HIGH, HIGH}));
+        // Initialization can take time before the first main-loop iteration.
+        fake_arduino::now += 1250;
+    };
+    setup();
+    ASSERT_EQ(source.starts, 1U);
+    EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{HIGH, HIGH}));
+    loop();
+    EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{HIGH, LOW}));
+    fake_arduino::now = 1500;
+    loop();
+    EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{LOW, LOW}));
+    onConnection(ESP_A2D_CONNECTION_STATE_CONNECTED, nullptr);
+    loop();
+    EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{LOW, LOW}));
+    fake_arduino::now = 2000;
+    loop();
+    EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{LOW, HIGH}));
+    EXPECT_EQ(fake_arduino::modes[18], 0);
+}
+
+TEST_F(FirmwareTest, StatusLedsRedTracksBluetoothConnectionRatherThanAudioState) {
+    setup();
+    loop();
+    EXPECT_EQ(digitalRead(27), HIGH);
+    fake_arduino::now = 500;
+    loop();
+    EXPECT_EQ(digitalRead(27), LOW);
+    onDiscovery(ESP_BT_GAP_DISCOVERY_STARTED);
+    onConnection(ESP_A2D_CONNECTION_STATE_CONNECTING, nullptr);
+    fake_arduino::now = 1000;
+    loop();
+    EXPECT_EQ(digitalRead(27), HIGH);
+    onConnection(ESP_A2D_CONNECTION_STATE_CONNECTED, nullptr);
+    loop();
+    EXPECT_EQ(shared.audio, ESP_A2D_AUDIO_STATE_STOPPED);
+    EXPECT_EQ(digitalRead(27), LOW);
+    onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+    loop();
+    EXPECT_EQ(shared.theremin, ThereminMode::Both);
+    onAudio(ESP_A2D_AUDIO_STATE_REMOTE_SUSPEND, nullptr);
+    fake_arduino::now += 1500;
+    loop();
+    EXPECT_EQ(digitalRead(27), LOW);
+    onConnection(ESP_A2D_CONNECTION_STATE_DISCONNECTED, nullptr);
+    loop();
+    EXPECT_EQ(digitalRead(27), HIGH);
+    fake_arduino::now += 500;
+    loop();
+    EXPECT_EQ(digitalRead(27), LOW);
+    onConnection(ESP_A2D_CONNECTION_STATE_DISCONNECTING, nullptr);
+    loop();
+    EXPECT_EQ(digitalRead(27), LOW);
+}
+
+TEST_F(FirmwareTest, StatusLedsUsePublishedShowcaseVoiceThenSelectedVoiceAfterStop) {
+    reset(true);
+    command("synth organ");
+    command("showcase");
+    render(2);
+    ASSERT_EQ(shared.playback.mode, Mode::Showcase);
+    loop();
+    fake_arduino::now = 250;
+    loop(); // Still the published sine voice, despite the selected organ.
+    EXPECT_EQ(digitalRead(26), HIGH);
+    shared.playback.voice = sounder::SynthVoice::Fm;
+    const auto fmAtMs = fake_arduino::now;
+    loop();
+    EXPECT_EQ(digitalRead(26), HIGH);
+    fake_arduino::now = fmAtMs + 167;
+    loop();
+    EXPECT_EQ(digitalRead(26), LOW);
+    command("synth pulse");
+    loop(); // A selection during showcase must not reset the published FM blink.
+    EXPECT_EQ(digitalRead(26), LOW);
+    command("stop");
+    const auto pulseAtMs = fake_arduino::now;
+    loop();
+    EXPECT_EQ(digitalRead(26), HIGH);
+    fake_arduino::now = pulseAtMs + 250;
+    loop();
+    EXPECT_EQ(digitalRead(26), LOW);
+}
+
+TEST_F(FirmwareTest, StatusLedsPreserveAudioAndAutomaticThereminStartup) {
+    setup();
+    EXPECT_TRUE(audioReady);
+    EXPECT_EQ(source.starts, 1U);
+    onConnection(ESP_A2D_CONNECTION_STATE_CONNECTED, nullptr);
+    onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+    loop();
+    EXPECT_EQ(shared.theremin, ThereminMode::Both);
+    sensorEcho(200, 34, 1000);
+    sensorEcho(235, 35, 1600);
+    const auto audio = render(4410);
+    EXPECT_TRUE(std::any_of(audio.begin(), audio.end(), [](const auto& f) { return f.channel1 != 0; }));
+    EXPECT_EQ(digitalRead(27), LOW);
+    EXPECT_EQ(fake_arduino::modes[18], 0);
 }
 
 TEST_F(FirmwareTest, ShowcasePlaysEveryPatternOnEveryVoice) {
@@ -879,10 +1342,12 @@ TEST_F(FirmwareTest, Setup) {
         setup();
         EXPECT_EQ(Serial.baud, 115200U);
         EXPECT_EQ(Serial.beginCalls, 1U);
+        EXPECT_EQ(fake_arduino::modes[25], INPUT_PULLUP);
         EXPECT_EQ(audioReady, fail == 0);
         EXPECT_EQ(commands == nullptr, fail == 1);
         EXPECT_EQ(oscillator.beginCalls, fail == 1 ? 0U : 1U);
         EXPECT_EQ(source.starts, fail == 0 ? 1U : 0U);
+        EXPECT_EQ(ledLevels(), (std::array<uint8_t, 2>{HIGH, HIGH}));
         EXPECT_FLOAT_EQ(oscillator.amplitude, 0);
         EXPECT_EQ(shared.playback.mode, Mode::Idle);
         EXPECT_FALSE(greetingShown);
@@ -908,6 +1373,134 @@ TEST_F(FirmwareTest, Setup) {
     }
 }
 
+TEST_F(FirmwareTest, BootStartsBothHandsOnceAfterStreamingWithoutSerial) {
+    setup();
+    loop();
+    EXPECT_FALSE(sensors.active());
+    command("theremin pitch"); // Rejected while disconnected; the boot default stays pending.
+    command("theremin off extra"); // Invalid commands also leave startup unchanged.
+    onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+    loop(); // Streaming alone is insufficient without a connected speaker.
+    EXPECT_EQ(shared.theremin, ThereminMode::Off);
+    onAudio(ESP_A2D_AUDIO_STATE_STOPPED, nullptr);
+    onConnection(ESP_A2D_CONNECTION_STATE_CONNECTED, nullptr);
+    loop();
+    EXPECT_FALSE(sensors.active());
+    command("synth pulse");
+    command("volume 20");
+    command("status");
+    command("sensors reset"); // Queries/settings/reset preserve the startup request.
+    onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+    loop();
+    ASSERT_EQ(shared.theremin, ThereminMode::Both);
+    ASSERT_TRUE(sensors.active());
+    EXPECT_EQ(sensors.measurementIntervalMs(), 70U);
+    EXPECT_EQ(shared.voice, sounder::SynthVoice::Pulse);
+    EXPECT_FLOAT_EQ(shared.level, 20);
+    EXPECT_FALSE(greetingShown); // No serial monitor is needed.
+    const auto generation = shared.generation;
+    for (const auto& frame : render(128)) EXPECT_EQ(frame.channel1, 0);
+    const auto firstPingAtMs = millis() + 200;
+    sensorEcho(firstPingAtMs, 34, 1000);
+    for (const auto& frame : render(128)) EXPECT_EQ(frame.channel1, 0);
+    sensorEcho(firstPingAtMs + 35, 35, 1600);
+    const auto audio = render(4410);
+    EXPECT_TRUE(std::any_of(audio.begin(), audio.end(), [](const auto& f) { return f.channel1 != 0; }));
+    loop();
+    EXPECT_EQ(shared.generation, generation);
+    EXPECT_EQ(sensors.pitchStatistics().valid, 1U);
+    EXPECT_EQ(sensors.volumeStatistics().valid, 1U);
+}
+
+TEST_F(FirmwareTest, ManualModesOverridePendingBootStartup) {
+    for (const char* text : {"stop", "!", "theremin off", "theremin pitch", "theremin volume", "theremin on",
+                             "sensors on", "sensors demo", "sensors pitch", "sensors volume", "sensors off",
+                             "tone 440", "note 69", "demo", "showcase", "vibrato"}) {
+        SCOPED_TRACE(text);
+        reset(true); // Streaming is ready, but the first main-loop iteration has not run.
+        Serial.connected = true;
+        greetingShown = true;
+        Serial.feed(std::string(text) + '\n');
+        readCommands();
+        const auto generation = shared.generation;
+        const auto mode = shared.theremin;
+        const auto active = sensors.active();
+        const auto interval = sensors.measurementIntervalMs();
+        const auto queued = commands->items.size();
+        loop();
+        EXPECT_EQ(shared.generation, generation);
+        EXPECT_EQ(shared.theremin, mode);
+        EXPECT_EQ(sensors.active(), active);
+        EXPECT_EQ(sensors.measurementIntervalMs(), interval);
+        EXPECT_EQ(commands->items.size(), queued);
+        if (queued != 0) {
+            render(128);
+            EXPECT_FALSE(shared.playback.live);
+            EXPECT_NE(shared.playback.mode, Mode::Idle);
+        }
+    }
+}
+
+TEST_F(FirmwareTest, StopAndDiagnosticsCancelBootStartupBeforeConnecting) {
+    for (const char* text : {"stop", "!", "theremin off", "sensors on", "sensors demo",
+                             "sensors pitch", "sensors volume", "sensors off"}) {
+        SCOPED_TRACE(text);
+        reset();
+        setup();
+        Serial.connected = true;
+        Serial.feed(std::string(text) + '\n');
+        loop();
+        const bool active = sensors.active();
+        onConnection(ESP_A2D_CONNECTION_STATE_CONNECTED, nullptr);
+        onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+        loop();
+        EXPECT_EQ(shared.theremin, ThereminMode::Off);
+        EXPECT_EQ(sensors.active(), active);
+        EXPECT_EQ(sensors.measurementIntervalMs(), 200U);
+        for (const auto& frame : render(128)) EXPECT_EQ(frame.channel1, 0);
+    }
+}
+
+TEST_F(FirmwareTest, BootStartupDoesNotResumeAfterStopDisconnectOrSuspension) {
+    for (const char* action : {"stop", "!", "theremin off", "disconnect", "suspend"}) {
+        SCOPED_TRACE(action);
+        reset(true);
+        loop();
+        ASSERT_EQ(shared.theremin, ThereminMode::Both);
+        sensorEcho(200, 34, 1000);
+        sensorEcho(235, 35, 1600);
+        const auto audio = render(4410);
+        ASSERT_TRUE(std::any_of(audio.begin(), audio.end(), [](const auto& f) { return f.channel1 != 0; }));
+        if (std::strcmp(action, "disconnect") == 0) onConnection(ESP_A2D_CONNECTION_STATE_DISCONNECTED, nullptr);
+        else if (std::strcmp(action, "suspend") == 0) onAudio(ESP_A2D_AUDIO_STATE_REMOTE_SUSPEND, nullptr);
+        else { Serial.feed(std::string(action) + '\n'); readCommands(); }
+        loop();
+        onConnection(ESP_A2D_CONNECTION_STATE_CONNECTED, nullptr);
+        onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+        loop();
+        EXPECT_EQ(shared.theremin, ThereminMode::Off);
+        for (const auto& frame : render(128)) EXPECT_EQ(frame.channel1, 0);
+        EXPECT_FALSE(shared.playback.live);
+    }
+}
+
+TEST_F(FirmwareTest, BootStartupDoesNotRunAfterInitializationFailure) {
+    for (bool queueFails : {false, true}) {
+        SCOPED_TRACE(queueFails);
+        reset();
+        fake_rtos::queueFails = queueFails;
+        fake_audio::beginFails = !queueFails;
+        setup();
+        onConnection(ESP_A2D_CONNECTION_STATE_CONNECTED, nullptr);
+        onAudio(ESP_A2D_AUDIO_STATE_STARTED, nullptr);
+        loop();
+        EXPECT_FALSE(audioReady);
+        EXPECT_FALSE(sensors.active());
+        EXPECT_EQ(shared.theremin, ThereminMode::Off);
+        for (const auto& frame : render(128)) EXPECT_EQ(frame.channel1, 0);
+    }
+}
+
 TEST_F(FirmwareTest, SensorCommandsWorkWithoutBluetoothOrAudioInitialization) {
     fake_rtos::queueFails = true;
     setup();
@@ -922,9 +1515,9 @@ TEST_F(FirmwareTest, SensorCommandsWorkWithoutBluetoothOrAudioInitialization) {
     fake_arduino::now = 200;
     loop();
     delayMicroseconds(100);
-    fake_arduino::edge(33, HIGH);
+    fake_arduino::edge(34, HIGH);
     delayMicroseconds(1000);
-    fake_arduino::edge(33, LOW);
+    fake_arduino::edge(34, LOW);
     loop();
     EXPECT_EQ(sensors.pitchStatistics().valid, 1U);
     fake_arduino::now = 300;
@@ -949,7 +1542,7 @@ TEST_F(FirmwareTest, LiveVibratoPitchChangesAudioAndUsesSelectedVoice) {
     EXPECT_EQ(sensors.measurementIntervalMs(), 70U);
     for (const auto& frame : render(4410)) EXPECT_EQ(frame.channel1, 0);
     EXPECT_TRUE(shared.playback.live);
-    sensorEcho(200, 33, 2911); // Approximately 50 cm: center approximately 220 Hz.
+    sensorEcho(200, 34, 2911); // Approximately 50 cm: center approximately 220 Hz.
     EXPECT_NEAR(shared.liveTarget.hz, 220, 0.2);
     EXPECT_FLOAT_EQ(shared.liveTarget.drive, 1);
     const auto low = render(4410);
@@ -957,13 +1550,13 @@ TEST_F(FirmwareTest, LiveVibratoPitchChangesAudioAndUsesSelectedVoice) {
     EXPECT_EQ(shared.playback.voice, sounder::SynthVoice::Pulse);
     EXPECT_GE(shared.playback.hz, 213);
     EXPECT_LE(shared.playback.hz, 227);
-    singleSensorEcho(270, 33, 2911); // Keep the stationary far hand fresh.
-    singleSensorEcho(340, 33, 292); // First large jump is held.
+    singleSensorEcho(270, 34, 2911); // Keep the stationary far hand fresh.
+    singleSensorEcho(340, 34, 292); // First large jump is held.
     EXPECT_NEAR(shared.liveTarget.hz, 220, 0.2);
     EXPECT_EQ(sensors.pitchHandReading().heldJumps, 1U);
     // A persistent new hand position must be confirmed, then approached gently.
     for (uint32_t atMs = 410; atMs <= 2370; atMs += 70) {
-        singleSensorEcho(atMs, 33, 292);
+        singleSensorEcho(atMs, 34, 292);
         render(3087);
     }
     EXPECT_NEAR(shared.liveTarget.hz, 880, 0.5);
@@ -985,13 +1578,13 @@ TEST_F(FirmwareTest, LiveVibratoVolumeUsesOneSensorAndMasterVolumeRemainsACeilin
     reset(true);
     command("volume 20");
     command("theremin volume");
-    sensorEcho(200, 14, 2911); // Approximately 50 cm: almost silent.
+    sensorEcho(200, 35, 2911); // Approximately 50 cm: almost silent.
     EXPECT_LT(shared.liveTarget.drive, 0.001f);
     for (const auto& frame : render(4410)) EXPECT_LE(std::abs(static_cast<int>(frame.channel1)), 4);
     EXPECT_FLOAT_EQ(shared.liveTarget.hz, 440);
     EXPECT_EQ(sensors.pitchStatistics().attempts, 0U);
     for (uint32_t atMs = 270; atMs <= 2370; atMs += 70) {
-        singleSensorEcho(atMs, 14, 200); // A confirmed near hand approaches full volume.
+        singleSensorEcho(atMs, 35, 200); // A confirmed near hand approaches full volume.
         render(3087);
     }
     EXPECT_FLOAT_EQ(shared.liveTarget.drive, 1);
@@ -1016,15 +1609,15 @@ TEST_F(FirmwareTest, LiveVolumeIgnoresTheIsolatedJumpSeenInTheSuppliedLog) {
     greetingShown = true;
     command("synth pulse");
     command("theremin volume");
-    singleSensorEcho(200, 14, 1055); // 18.12 cm establishes the hand position.
+    singleSensorEcho(200, 35, 1055); // 18.12 cm establishes the hand position.
     const float steadyDrive = shared.liveTarget.drive;
     render(4410);
-    singleSensorEcho(270, 14, 2285); // Raw 39.24 cm must not change the sound target.
+    singleSensorEcho(270, 35, 2285); // Raw 39.24 cm must not change the sound target.
     EXPECT_NEAR(sensors.volumeReading().distanceCm, 39.24f, 0.01f);
     EXPECT_NEAR(sensors.volumeHandReading().distanceCm, 18.12f, 0.01f);
     EXPECT_FLOAT_EQ(shared.liveTarget.drive, steadyDrive);
     EXPECT_EQ(sensors.volumeHandReading().heldJumps, 1U);
-    singleSensorEcho(340, 14, 1075); // Return to 18.46 cm resumes gentle tracking.
+    singleSensorEcho(340, 35, 1075); // Return to 18.46 cm resumes gentle tracking.
     fake_arduino::now = 375;
     loop();
     EXPECT_NEAR(shared.liveTarget.drive, steadyDrive, 0.01f);
@@ -1036,12 +1629,12 @@ TEST_F(FirmwareTest, LiveVolumeIgnoresTheIsolatedJumpSeenInTheSuppliedLog) {
     EXPECT_GT(shared.liveTarget.drive, 0.6f);
 }
 
-TEST_F(FirmwareTest, LiveVibratoNeedsBothHandsAndFadesAfterLostReadingsOrStalledLoop) {
+TEST_F(FirmwareTest, LiveVibratoNeedsInitialHandsAndMainTaskWatchdogRemainsSeparate) {
     reset(true);
     command("theremin on");
-    sensorEcho(200, 33, 1600); // Pitch alone cannot sound in both-hands mode.
+    sensorEcho(200, 34, 1600); // Pitch alone cannot sound in both-hands mode.
     for (const auto& frame : render(4410)) EXPECT_EQ(frame.channel1, 0);
-    sensorEcho(300, 14, 1600);
+    sensorEcho(300, 35, 1600);
     EXPECT_GT(shared.liveTarget.drive, 0.4f);
     render(4410);
     EXPECT_GT(oscillator.amplitude, 4000);
@@ -1050,11 +1643,57 @@ TEST_F(FirmwareTest, LiveVibratoNeedsBothHandsAndFadesAfterLostReadingsOrStalled
     render(4410);
     EXPECT_FLOAT_EQ(shared.playback.drive, 0);
     EXPECT_FLOAT_EQ(oscillator.amplitude, 0);
-    // A running loop still mutes when the underlying hand readings expire.
+    // A resumed main loop publishes held values even with no fresh hand readings.
+    sensors.update();
     updateTheremin();
-    EXPECT_FLOAT_EQ(shared.liveTarget.drive, 0);
+    EXPECT_GT(shared.liveTarget.drive, 0.4f);
     render(4410);
-    EXPECT_FLOAT_EQ(oscillator.amplitude, 0);
+    EXPECT_GT(oscillator.amplitude, 4000);
+}
+
+TEST_F(FirmwareTest, HandsHoldTheirSoundOutsideRangeAndReturnWithoutMatchingOldPositions) {
+    reset(true);
+    Serial.connected = true;
+    greetingShown = true;
+    command("synth pulse");
+    command("theremin on");
+    sensorEcho(200, 34, 1000);
+    sensorEcho(235, 35, 1600);
+    const float heldHz = shared.liveTarget.hz;
+    const float heldDrive = shared.liveTarget.drive;
+    render(4410);
+    sensorEcho(270, 34, 3338); // Pitch hand leaves; a distant reflector is ignored.
+    sensorEcho(305, 35, 5500); // Volume hand leaves too.
+    fake_arduino::now = 2000;
+    loop(); // Hold after a long gap; this also triggers the next pitch attempt.
+    EXPECT_FLOAT_EQ(shared.liveTarget.hz, heldHz);
+    EXPECT_FLOAT_EQ(shared.liveTarget.drive, heldDrive);
+    EXPECT_TRUE(sensors.pitchHandReading().holding);
+    EXPECT_TRUE(sensors.volumeHandReading().holding);
+    EXPECT_NE(Serial.output.find("(hold)"), std::string::npos);
+    render(4410);
+    EXPECT_GT(oscillator.amplitude, 0);
+    // Complete the pending pitch attempt with the first returning position.
+    delayMicroseconds(100);
+    fake_arduino::edge(34, HIGH);
+    delayMicroseconds(2300);
+    fake_arduino::edge(34, LOW);
+    loop();
+    EXPECT_FLOAT_EQ(shared.liveTarget.hz, heldHz);
+    sensorEcho(2035, 35, 600);
+    EXPECT_FLOAT_EQ(shared.liveTarget.drive, heldDrive);
+    sensorEcho(2070, 34, 2300); // Confirm approximately 39.5 cm, far from the old pitch hand.
+    EXPECT_NE(shared.liveTarget.hz, heldHz);
+    EXPECT_FLOAT_EQ(sensors.pitchHandReading().distanceCm, sensors.pitchReading().distanceCm);
+    EXPECT_FLOAT_EQ(shared.liveTarget.drive, heldDrive); // Volume remains held independently.
+    sensorEcho(2105, 35, 600); // Confirm approximately 10.3 cm for the other hand.
+    EXPECT_GT(shared.liveTarget.drive, 0.8f);
+    EXPECT_FALSE(sensors.pitchHandReading().holding);
+    EXPECT_FALSE(sensors.volumeHandReading().holding);
+    render(2205); // Only the short audio glide is needed after re-entry.
+    EXPECT_NEAR(shared.playback.drive, shared.liveTarget.drive, 0.0001f);
+    command("stop");
+    for (const auto& frame : render(128)) EXPECT_EQ(frame.channel1, 0);
 }
 
 TEST_F(FirmwareTest, LiveVibratoStopsAndNeverResumesAfterDisconnectOrSuspension) {
@@ -1063,7 +1702,7 @@ TEST_F(FirmwareTest, LiveVibratoStopsAndNeverResumesAfterDisconnectOrSuspension)
         SCOPED_TRACE(action);
         reset(true);
         command("theremin pitch");
-        sensorEcho(200, 33, 1000);
+        sensorEcho(200, 34, 1000);
         render(4410);
         ASSERT_GT(oscillator.amplitude, 0);
         const bool disconnected = std::strcmp(action, "disconnect") == 0;

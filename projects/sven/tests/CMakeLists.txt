@@ -23,6 +23,8 @@ add_executable(bluetooth_audio_tests
     test/test_firmware/test_ultrasonic.cpp
     test/test_firmware/test_theremin.cpp
     test/test_firmware/test_hand_distance_filter.cpp
+    test/test_firmware/test_synth_button.cpp
+    test/test_firmware/test_status_leds.cpp
 )
 target_include_directories(bluetooth_audio_tests PRIVATE test/support ../include)
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")

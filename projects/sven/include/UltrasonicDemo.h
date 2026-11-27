@@ -8,7 +8,7 @@
 namespace sounder {
 
 // Owns the measurement schedule and serial diagnostics, independent of audio.
-// Pin defaults match final-project-proposal.md. No GPIO is touched until start.
+// Pin defaults match docs/ultrasonic-sensors.md. No GPIO is touched until start.
 class UltrasonicDemo {
 public:
     enum class Selection { Both, Pitch, Volume };
@@ -27,8 +27,9 @@ public:
         float maxCm = 0.0f;
     };
 
-    UltrasonicDemo(uint8_t pitchTrigger = 32, uint8_t pitchEcho = 33,
-                   uint8_t volumeTrigger = 13, uint8_t volumeEcho = 14)
+    // GPIO34/35 are input-only; GPIO32/33 supply the trigger pulses.
+    UltrasonicDemo(uint8_t pitchTrigger = 32, uint8_t pitchEcho = 34,
+                   uint8_t volumeTrigger = 33, uint8_t volumeEcho = 35)
         : pitch_(pitchTrigger, pitchEcho), volume_(volumeTrigger, volumeEcho) {}
 
     void start(Selection selection = Selection::Both, Timing timing = Timing::Diagnostic) {
@@ -61,8 +62,10 @@ public:
         if (pitch_.poll()) record(pitch_.reading(), pitchStats_, pitchFilter_);
         if (volume_.poll()) record(volume_.reading(), volumeStats_, volumeFilter_);
         const uint32_t nowMs = millis();
-        pitchHand_ = pitchFilter_.sample(nowMs);
-        volumeHand_ = volumeFilter_.sample(nowMs);
+        if (timing_ == Timing::Live) {
+            pitchHand_ = pitchFilter_.sample(nowMs);
+            volumeHand_ = volumeFilter_.sample(nowMs);
+        }
         report(nowMs);
         if (pitch_.busy() || volume_.busy() || nowMs - lastSlotMs_ < slotDelayMs_) return;
         // No catch-up bursts after a delayed loop, and never simultaneous pings.
@@ -138,9 +141,11 @@ private:
         Serial.println("Use sensors [on|demo|pitch|volume|off|status|reset].");
     }
 
-    static void record(const UltrasonicSensor::Reading& reading, Statistics& stats, HandDistanceFilter& filter) {
+    void record(const UltrasonicSensor::Reading& reading, Statistics& stats, HandDistanceFilter& filter) {
         ++stats.attempts;
-        filter.observe(reading.status == UltrasonicSensor::Status::Valid, reading.distanceCm, reading.completedAtMs);
+        if (timing_ == Timing::Live) {
+            filter.observe(reading.status == UltrasonicSensor::Status::Valid, reading.distanceCm, reading.completedAtMs);
+        }
         if (reading.status == UltrasonicSensor::Status::Valid) {
             if (stats.valid == 0 || reading.distanceCm < stats.minCm) stats.minCm = reading.distanceCm;
             if (stats.valid == 0 || reading.distanceCm > stats.maxCm) stats.maxCm = reading.distanceCm;
@@ -172,7 +177,7 @@ private:
             Serial.printf("%s", "distance n/a | ");
         }
         if (timing_ == Timing::Live) {
-            if (hand.valid) Serial.printf("hand %.2f cm | ", hand.distanceCm);
+            if (hand.valid) Serial.printf("hand %.2f cm%s | ", hand.distanceCm, hand.holding ? " (hold)" : "");
             else Serial.printf("%s", "hand n/a | ");
             Serial.printf("held %lu | ", static_cast<unsigned long>(hand.heldJumps));
         }

@@ -12,7 +12,7 @@ class HandDistanceFilter {
 public:
     static constexpr float kMinCm = 2.0f;
     static constexpr float kMaxCm = 50.0f;
-    static constexpr uint32_t kHoldMs = 250;
+    static constexpr uint32_t kTrackingTimeoutMs = 250; // Freeze after a gap; never expires a held value.
     static constexpr float kJumpCm = 4.0f;
     static constexpr float kConfirmCm = 2.0f;
     static constexpr uint32_t kConfirmMs = 200;
@@ -21,10 +21,11 @@ public:
     static constexpr float kMaxSpeedCmPerSecond = 30.0f;
 
     struct Reading {
-        bool valid = false;
+        bool valid = false; // At least one accepted position exists, including a held position.
         float distanceCm = 0.0f;
         uint32_t acceptedAtMs = 0;
         uint32_t heldJumps = 0;
+        bool holding = false; // Output is frozen while waiting for the hand to return.
     };
 
     void reset() { *this = {}; }
@@ -39,24 +40,25 @@ public:
         advance(measuredAtMs);
         if (!valid || !std::isfinite(distanceCm) || distanceCm < kMinCm || distanceCm > kMaxCm) {
             candidate_ = false;
+            tracking_ = false;
             return;
         }
         if (!initialized_) {
             initialize(distanceCm, measuredAtMs);
             return;
         }
-        const bool expired = measuredAtMs - acceptedAtMs_ >= kHoldMs;
-        if (expired || std::fabs(distanceCm - anchorCm_) > kJumpCm) {
+        if (!tracking_ || std::fabs(distanceCm - anchorCm_) > kJumpCm) {
             if (!candidate_ || measuredAtMs - candidateAtMs_ > kConfirmMs ||
                 std::fabs(distanceCm - candidateCm_) > kConfirmCm) {
                 candidate_ = true;
                 candidateCm_ = distanceCm;
                 candidateAtMs_ = measuredAtMs;
-                if (!expired) ++heldJumps_;
+                if (tracking_) ++heldJumps_;
                 return;
             }
-            // Reacquire after silence only when the new hand position repeats.
-            if (expired) {
+            // Returning hands establish a new absolute position; no need to
+            // move back to the old value or slew across the entire gap.
+            if (!tracking_) {
                 initialize(distanceCm, measuredAtMs);
                 return;
             }
@@ -69,12 +71,13 @@ public:
 
     Reading sample(uint32_t nowMs) {
         advance(nowMs);
-        return {initialized_ && nowMs - acceptedAtMs_ < kHoldMs, currentCm_, acceptedAtMs_, heldJumps_};
+        return {initialized_, currentCm_, acceptedAtMs_, heldJumps_, initialized_ && !tracking_};
     }
 
 private:
     void initialize(float distanceCm, uint32_t measuredAtMs) {
         initialized_ = true;
+        tracking_ = true;
         candidate_ = false;
         currentCm_ = targetCm_ = anchorCm_ = distanceCm;
         acceptedAtMs_ = advancedAtMs_ = measuredAtMs;
@@ -84,13 +87,18 @@ private:
         const uint32_t elapsed = nowMs - advancedAtMs_;
         if (elapsed == 0 || elapsed > UINT32_MAX / 2) return;
         advancedAtMs_ = nowMs;
-        if (!initialized_) return;
+        if (!initialized_ || !tracking_) return;
+        if (nowMs - acceptedAtMs_ >= kTrackingTimeoutMs) {
+            tracking_ = false;
+            return; // Freeze the last output when usable observations cease.
+        }
         const float mix = 1.0f - std::exp(-static_cast<float>(elapsed) / kSmoothingMs);
         const float limit = kMaxSpeedCmPerSecond * elapsed / 1000.0f;
         currentCm_ += std::clamp((targetCm_ - currentCm_) * mix, -limit, limit);
     }
 
     bool initialized_ = false;
+    bool tracking_ = false;
     bool observed_ = false;
     bool candidate_ = false;
     float currentCm_ = 0.0f;

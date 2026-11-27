@@ -5,8 +5,11 @@
 #include <freertos/queue.h>
 
 #include "Playback.h"
+#include "StatusLeds.h"
+#include "SynthButton.h"
 #include "Synthesizer.h"
 #include "ThereminController.h"
+#include "ThereminStartup.h"
 #include "UltrasonicDemo.h"
 
 #include <cerrno>
@@ -22,6 +25,7 @@ namespace {
 
 constexpr char kSpeakerName[] = "JBL Flip 4";
 constexpr size_t kCommandCapacity = 8;
+constexpr uint32_t kLiveControlTimeoutMs = 250; // Main-task watchdog, independent of hand presence.
 
 class SpeakerSource : public BluetoothA2DPSource {
 public:
@@ -50,12 +54,22 @@ struct SharedState {
     esp_a2d_audio_state_t audio = ESP_A2D_AUDIO_STATE_STOPPED;
     bool discovering = false;
     float level = sounder::kDefaultLevel;
+    bool muted = false;
     sounder::SynthVoice voice = sounder::SynthVoice::Sine;
     uint32_t generation = 0;
     sounder::PlaybackStatus playback;
     ThereminMode theremin = ThereminMode::Off;
     sounder::Frame liveTarget{440.0f, 0.0f};
     uint32_t liveUpdatedAtMs = 0;
+};
+
+struct ProgressSnapshot {
+    esp_a2d_connection_state_t connection = ESP_A2D_CONNECTION_STATE_DISCONNECTED;
+    esp_a2d_audio_state_t audio = ESP_A2D_AUDIO_STATE_STOPPED;
+    bool discovering = false;
+    PlaybackMode mode = PlaybackMode::Idle;
+    size_t pattern = 0;
+    size_t tourIndex = 0;
 };
 
 portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
@@ -66,11 +80,14 @@ sounder::Playback playback(synthesizer);
 SpeakerSource source;
 sounder::UltrasonicDemo sensors;
 sounder::ThereminController theremin;
+sounder::ThereminStartup thereminStartup;
+sounder::SynthButton synthButton;
+sounder::StatusLeds statusLeds;
 QueueHandle_t commands = nullptr;
 uint32_t renderedGeneration = 0;
 bool audioReady = false;
 bool greetingShown = false;
-SharedState reported;
+ProgressSnapshot reported;
 bool progressReported = false;
 char input[80];
 size_t inputLength = 0;
@@ -84,6 +101,7 @@ SharedState readState() {
 }
 
 void requestStop() {
+    thereminStartup.cancel();
     portENTER_CRITICAL(&stateMux);
     // Invalidates queued commands too. Stop never has to wait for queue space.
     ++shared.generation;
@@ -143,6 +161,7 @@ int32_t renderAudio(::Frame* frames, int32_t count) {
         renderedGeneration = control.generation;
     }
     playback.setLevel(control.level);
+    playback.setMuted(control.muted);
     Command command;
     // Bounded, nonblocking work, even during a large serial paste.
     for (size_t i = 0; i < kCommandCapacity && commands != nullptr &&
@@ -157,6 +176,7 @@ int32_t renderAudio(::Frame* frames, int32_t count) {
             renderedGeneration = control.generation;
         }
         playback.setLevel(control.level);
+        playback.setMuted(control.muted);
         if (!connected || command.generation != control.generation) {
             continue;
         }
@@ -175,7 +195,7 @@ int32_t renderAudio(::Frame* frames, int32_t count) {
     if (connected && control.theremin != ThereminMode::Off) {
         auto target = control.liveTarget;
         // Also fade out if the main task stops publishing controls entirely.
-        if (millis() - control.liveUpdatedAtMs >= sounder::ThereminController::kHoldMs) target.drive = 0.0f;
+        if (millis() - control.liveUpdatedAtMs >= kLiveControlTimeoutMs) target.drive = 0.0f;
         playback.setLiveTarget(target);
     }
     playback.setVoice(control.voice);
@@ -196,15 +216,14 @@ int32_t renderAudio(::Frame* frames, int32_t count) {
 void updateTheremin() {
     const auto state = readState();
     if (state.theremin == ThereminMode::Off) {
-        theremin.stop();
+        if (theremin.mode() != ThereminMode::Off) theremin.stop();
         return;
     }
     const auto& pitch = sensors.pitchHandReading();
     const auto& volume = sensors.volumeHandReading();
     const uint32_t nowMs = millis();
-    const auto target = theremin.update(nowMs,
-        {pitch.valid, pitch.distanceCm, pitch.acceptedAtMs},
-        {volume.valid, volume.distanceCm, volume.acceptedAtMs});
+    const auto target = theremin.update(
+        {pitch.valid, pitch.distanceCm}, {volume.valid, volume.distanceCm});
     portENTER_CRITICAL(&stateMux);
     // A concurrent stop/disconnect or replacement command wins over this update.
     if (shared.generation == state.generation && shared.theremin == state.theremin) {
@@ -214,19 +233,19 @@ void updateTheremin() {
     portEXIT_CRITICAL(&stateMux);
 }
 
-void startTheremin(ThereminMode mode) {
+bool startTheremin(ThereminMode mode) {
     const auto state = readState();
     if (!audioReady) {
         Serial.println("Audio initialization failed; restart the board.");
-        return;
+        return false;
     }
     if (state.connection != ESP_A2D_CONNECTION_STATE_CONNECTED) {
         Serial.println("Speaker not connected; put it in pairing mode and check status.");
-        return;
+        return false;
     }
     if (state.audio != ESP_A2D_AUDIO_STATE_STARTED) {
         Serial.println("Bluetooth audio is not streaming; resume the speaker and retry.");
-        return;
+        return false;
     }
     using Selection = sounder::UltrasonicDemo::Selection;
     sensors.start(mode == ThereminMode::Pitch ? Selection::Pitch :
@@ -247,18 +266,18 @@ void startTheremin(ThereminMode mode) {
     if (!ready) {
         theremin.stop();
         Serial.println("Connection changed; retry theremin.");
-        return;
+        return false;
     }
     Serial.printf("Theremin %s started with vibrato (5 Hz, +/-50 cents). Hands 5..50 cm; pitch closer = higher, volume closer = louder. Use stop to finish.\n",
                   sounder::ThereminController::modeName(mode));
+    return true;
 }
 
 void showThereminStatus() {
     const auto state = readState();
-    Serial.printf("Theremin %s | vibrato 5 Hz +/-50 cents | center %.1f Hz | hand level %.1f%% | master %.1f%% | hands 5..50 cm | hold %lu ms\n",
+    Serial.printf("Theremin %s | vibrato 5 Hz +/-50 cents | center %.1f Hz | hand level %.1f%% | master %.1f%% | hands 5..50 cm | hands out: hold last values\n",
                   sounder::ThereminController::modeName(state.theremin), state.liveTarget.hz,
-                  state.liveTarget.drive * 100.0f, state.level,
-                  static_cast<unsigned long>(sounder::ThereminController::kHoldMs));
+                  state.liveTarget.drive * 100.0f, state.level);
 }
 
 bool parseNumber(const char* text, float low, float high, float& value) {
@@ -297,6 +316,25 @@ const char* synthName(sounder::SynthVoice voice) {
     return "unknown";
 }
 
+void updateSynthButton() {
+    const auto event = synthButton.poll();
+    if (event == sounder::SynthButton::Event::None) return;
+    portENTER_CRITICAL(&stateMux);
+    const bool toggleMute = event == sounder::SynthButton::Event::LongPress || shared.muted;
+    if (toggleMute) {
+        shared.muted = !shared.muted;
+    } else {
+        shared.voice = sounder::SynthButton::nextVoice(shared.voice);
+    }
+    const bool muted = shared.muted;
+    const auto voice = shared.voice;
+    portEXIT_CRITICAL(&stateMux);
+    if (Serial) {
+        if (toggleMute) Serial.println(muted ? "Sound muted." : "Sound on.");
+        else Serial.printf("Synth %s.\n", synthName(voice));
+    }
+}
+
 const sounder::SynthOption* findSynthOption(const char* name) {
     for (const auto& option : sounder::kSynthOptions) {
         if (std::strcmp(option.name, name) == 0) return &option;
@@ -306,7 +344,7 @@ const sounder::SynthOption* findSynthOption(const char* name) {
 
 void showHelp() {
     Serial.printf("\nSounder | Bluetooth audio | target %s\n", kSpeakerName);
-    Serial.println("Put the speaker in pairing mode. Playback stays silent until commanded.");
+    Serial.println("Put the speaker in pairing mode. Theremin starts automatically when audio streams.");
     Serial.println("  demo             Complete tour once (~45 seconds)");
     Serial.println("  showcase         Play every demo on each synth voice");
     for (size_t i = 0; i < sounder::kPatternCount; ++i) {
@@ -317,6 +355,7 @@ void showHelp() {
     Serial.println("  tone 440 [1500]  100..8000 Hz; optional duration 10..30000 ms");
     Serial.println("  note 69          MIDI note 45..119; 69 = 440 Hz");
     Serial.println("  synth [voice]    Set or show voice (sine, triangle, pulse, fm, organ)");
+    Serial.println("  GPIO25 button    Click: unmute or next synth; hold 3 seconds: mute/unmute");
     Serial.println("  volume [0..100]  Set/query PCM amplitude; default 35%; 0 mutes");
     Serial.println("  level 0..100     Alias for setting volume");
     Serial.println("  stop / !         Silence and discard pending playback");
@@ -336,11 +375,11 @@ void showStatus() {
                        sounder::kPatterns[sound.pattern].name;
     const bool showcase = sound.mode == PlaybackMode::Showcase;
     const char* prefix = showcase ? "showcase/" : sound.mode == PlaybackMode::Tour ? "tour/" : "";
-    Serial.printf("%s | %s%s | audio %s | %s%s | synth %s | target %.1f Hz | level %.1f%% | drive %.1f%% | 44100 Hz/stereo/16-bit\n",
+    Serial.printf("%s | %s%s | audio %s | %s%s%s | synth %s | target %.1f Hz | level %.1f%% | drive %.1f%% | 44100 Hz/stereo/16-bit\n",
                   kSpeakerName, connectionName(state.connection),
                   state.discovering ? "/discovering" : "", audioName(state.audio),
-                  prefix, mode, synthName(showcase ? sound.voice : state.voice),
-                  sound.hz, state.level, sound.drive * state.level);
+                  state.muted ? "muted/" : "", prefix, mode, synthName(showcase ? sound.voice : state.voice),
+                  sound.hz, state.level, state.muted ? 0.0f : sound.drive * state.level);
 }
 
 bool queuePlayback(Command command) {
@@ -358,6 +397,7 @@ bool queuePlayback(Command command) {
         Serial.println("Command queue full; retry. Stop and ! still work.");
         return false;
     }
+    thereminStartup.cancel();
     return true;
 }
 
@@ -383,8 +423,10 @@ void handleCommand(char* line) {
             requestStop();
             Serial.println("Theremin stopped; buffered Bluetooth audio may finish first.");
         } else if (std::strcmp(arg1, "on") == 0 || std::strcmp(arg1, "pitch") == 0 || std::strcmp(arg1, "volume") == 0) {
-            startTheremin(std::strcmp(arg1, "pitch") == 0 ? ThereminMode::Pitch :
-                          std::strcmp(arg1, "volume") == 0 ? ThereminMode::Volume : ThereminMode::Both);
+            if (startTheremin(std::strcmp(arg1, "pitch") == 0 ? ThereminMode::Pitch :
+                              std::strcmp(arg1, "volume") == 0 ? ThereminMode::Volume : ThereminMode::Both)) {
+                thereminStartup.cancel();
+            }
         } else {
             Serial.println("Use theremin [on|pitch|volume|off|status].");
         }
@@ -393,8 +435,10 @@ void handleCommand(char* line) {
         // Changing acquisition mode also ends live audio. Queries/reset do not.
         if (arg2 == nullptr && arg1 != nullptr &&
             (std::strcmp(arg1, "on") == 0 || std::strcmp(arg1, "demo") == 0 ||
-             std::strcmp(arg1, "pitch") == 0 || std::strcmp(arg1, "volume") == 0 || std::strcmp(arg1, "off") == 0) &&
-            readState().theremin != ThereminMode::Off) requestStop();
+             std::strcmp(arg1, "pitch") == 0 || std::strcmp(arg1, "volume") == 0 || std::strcmp(arg1, "off") == 0)) {
+            thereminStartup.cancel();
+            if (readState().theremin != ThereminMode::Off) requestStop();
+        }
         return;
     } else if (std::strcmp(name, "stop") == 0 && arg1 == nullptr) {
         requestStop();
@@ -490,9 +534,8 @@ void reportProgress() {
                       state.discovering ? "/discovering" : "", audioName(state.audio));
     }
     const auto& sound = state.playback;
-    const auto& previous = reported.playback;
-    const bool patternChanged = !progressReported || sound.mode != previous.mode || sound.pattern != previous.pattern;
-    if (sound.mode == PlaybackMode::Showcase && (patternChanged || sound.tourIndex != previous.tourIndex)) {
+    const bool patternChanged = !progressReported || sound.mode != reported.mode || sound.pattern != reported.pattern;
+    if (sound.mode == PlaybackMode::Showcase && (patternChanged || sound.tourIndex != reported.tourIndex)) {
         const auto section = sound.tourIndex * sounder::kPatternCount + sound.pattern + 1;
         Serial.printf("[showcase %u/%u] %s / %s\n", static_cast<unsigned>(section),
                       static_cast<unsigned>(sounder::kPatternCount * sounder::kSynthVoiceCount),
@@ -500,10 +543,10 @@ void reportProgress() {
     } else if ((sound.mode == PlaybackMode::Pattern || sound.mode == PlaybackMode::Tour) && patternChanged) {
         Serial.printf("[%u/%u] %s\n", static_cast<unsigned>(sound.pattern + 1),
                       static_cast<unsigned>(sounder::kPatternCount), sounder::kPatterns[sound.pattern].name);
-    } else if (sound.mode == PlaybackMode::Idle && previous.mode != PlaybackMode::Idle) {
+    } else if (sound.mode == PlaybackMode::Idle && reported.mode != PlaybackMode::Idle) {
         Serial.println("Finished; silent.");
     }
-    reported = state;
+    reported = {state.connection, state.audio, state.discovering, sound.mode, sound.pattern, sound.tourIndex};
     progressReported = true;
 }
 
@@ -511,6 +554,10 @@ void reportProgress() {
 
 void setup() {
     Serial.begin(115200);
+    synthButton.begin();
+    statusLeds.begin();
+    // Light both indicators before audio/Bluetooth initialization can delay loop().
+    statusLeds.update(readState().voice, false);
     commands = xQueueCreate(kCommandCapacity, sizeof(Command));
     if (commands == nullptr) return;
     audioReady = oscillator.begin(audio_tools::AudioInfo(sounder::kSampleRate, 1, 16), 440.0f);
@@ -539,6 +586,13 @@ void loop() {
         greetingShown = true;
     }
     readCommands();
+    updateSynthButton();
+    const auto state = readState();
+    const auto indicatedVoice = state.playback.mode == PlaybackMode::Showcase ? state.playback.voice : state.voice;
+    statusLeds.update(indicatedVoice, state.connection == ESP_A2D_CONNECTION_STATE_CONNECTED);
+    thereminStartup.update(audioReady && state.connection == ESP_A2D_CONNECTION_STATE_CONNECTED &&
+                          state.audio == ESP_A2D_AUDIO_STATE_STARTED,
+                          [] { return startTheremin(ThereminMode::Both); });
     sensors.update();
     updateTheremin();
     if (Serial) reportProgress();

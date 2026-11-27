@@ -31,6 +31,7 @@ public:
     void (*audio)(esp_a2d_audio_state_t, void*) = nullptr;
     void (*discovery)(esp_bt_gap_discovery_state_t) = nullptr;
     bool (*select)(const char*, esp_bd_addr_t, int) = nullptr;
+    void (*beforeStart)() = nullptr;
     void set_auto_reconnect(bool enabled, int count = 0) { reconnectEnabled = enabled; retries = count; }
     void set_local_name(const char* text) { localName = text; }
     void set_data_callback_in_frames(int32_t (*cb)(Frame*, int32_t)) { render = cb; }
@@ -40,7 +41,10 @@ public:
     void set_ssid_callback(bool (*cb)(const char*, esp_bd_addr_t, int)) { select = cb; }
     void set_ssp_enabled(bool enabled) { ssp = enabled; }
     void set_pin_code(const char* text, esp_bt_pin_type_t type) { pin = text; pinType = type; }
-    void start() { ++starts; }
+    void start() {
+        if (beforeStart != nullptr) beforeStart();
+        ++starts;
+    }
     bool reconnectAllowed() const { return is_autoreconnect_allowed; }
 protected:
     bool is_autoreconnect_allowed = false;

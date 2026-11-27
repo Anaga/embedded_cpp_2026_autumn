@@ -18,16 +18,19 @@ struct Interrupt { void (*handler)(void*) = nullptr; void* argument = nullptr; }
 struct Write { uint8_t pin; uint8_t value; uint32_t atUs; };
 inline std::array<uint8_t, 40> levels{};
 inline std::array<uint8_t, 40> modes{};
+inline std::array<bool, 40> externallyDriven{};
 inline std::array<Interrupt, 40> interrupts{};
 inline std::vector<Write> writes;
 inline void resetGpio() {
     microsecondRemainder = 0;
     levels = {};
     modes = {};
+    externallyDriven = {};
     interrupts = {};
     writes.clear();
 }
 inline void edge(uint8_t pin, uint8_t value) {
+    externallyDriven.at(pin) = true;
     const bool changed = levels.at(pin) != value;
     levels.at(pin) = value;
     const auto irq = interrupts.at(pin);
@@ -39,6 +42,7 @@ inline void edge(uint8_t pin, uint8_t value) {
 constexpr uint8_t LOW = 0;
 constexpr uint8_t HIGH = 1;
 constexpr uint8_t INPUT = 1;
+constexpr uint8_t INPUT_PULLUP = 5;
 constexpr uint8_t OUTPUT = 3;
 constexpr int CHANGE = 3;
 inline uint32_t millis() { return fake_arduino::now; }
@@ -48,7 +52,10 @@ inline void delayMicroseconds(uint32_t us) {
     fake_arduino::now += fake_arduino::microsecondRemainder / 1000;
     fake_arduino::microsecondRemainder %= 1000;
 }
-inline void pinMode(uint8_t pin, uint8_t mode) { fake_arduino::modes.at(pin) = mode; }
+inline void pinMode(uint8_t pin, uint8_t mode) {
+    fake_arduino::modes.at(pin) = mode;
+    if (mode == INPUT_PULLUP && !fake_arduino::externallyDriven.at(pin)) fake_arduino::levels.at(pin) = HIGH;
+}
 inline int digitalRead(uint8_t pin) { return fake_arduino::levels.at(pin); }
 inline void digitalWrite(uint8_t pin, uint8_t value) {
     fake_arduino::levels.at(pin) = value;

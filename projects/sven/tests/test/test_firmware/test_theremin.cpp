@@ -14,60 +14,59 @@ TEST(ThereminControllerTest, PitchAndVolumeLandmarks) {
     Controller controller;
     for (const auto& row : {std::pair<float, float>{5, 880}, {27.5f, 440}, {50, 220}}) {
         controller.start(Mode::Pitch);
-        const auto target = controller.update(100, {true, row.first, 100}, {});
+        const auto target = controller.update({true, row.first}, {});
         EXPECT_NEAR(target.hz, row.second, 0.001);
         EXPECT_FLOAT_EQ(target.drive, 1);
     }
     for (const auto& row : {std::pair<float, float>{2, 1}, {5, 1}, {27.5f, 0.5f}, {50, 0}}) {
         controller.start(Mode::Volume);
-        const auto target = controller.update(100, {}, {true, row.first, 100});
+        const auto target = controller.update({}, {true, row.first});
         EXPECT_FLOAT_EQ(target.hz, 440);
         EXPECT_FLOAT_EQ(target.drive, row.second);
     }
 }
 
-TEST(ThereminControllerTest, BothInputsRequiredAndMissingReadingsExpire) {
+TEST(ThereminControllerTest, BothInputsRequiredInitiallyAndEachMissingHandHoldsIndependently) {
     Controller controller;
     controller.start(Mode::Both);
-    EXPECT_FLOAT_EQ(controller.update(0, {}, {}).drive, 0);
-    EXPECT_FLOAT_EQ(controller.update(0, {true, 5, 0}, {}).drive, 0);
-    EXPECT_FLOAT_EQ(controller.update(0, {}, {true, 5, 0}).drive, 1);
-    const auto held = controller.update(249, {}, {});
+    EXPECT_FLOAT_EQ(controller.update({}, {}).drive, 0);
+    EXPECT_FLOAT_EQ(controller.update({true, 5}, {}).drive, 0);
+    EXPECT_FLOAT_EQ(controller.update({}, {true, 5}).drive, 1);
+    const auto held = controller.update({}, {});
     EXPECT_FLOAT_EQ(held.hz, 880);
     EXPECT_FLOAT_EQ(held.drive, 1);
-    EXPECT_FLOAT_EQ(controller.update(250, {}, {}).drive, 0);
-    // Recovering only one hand is insufficient after the other has expired.
-    EXPECT_FLOAT_EQ(controller.update(350, {true, 27.5f, 350}, {}).drive, 0);
-    const auto recovered = controller.update(450, {}, {true, 27.5f, 450});
+    EXPECT_FLOAT_EQ(controller.update({}, {}).drive, 1);
+    // Pitch resumes at a new position while volume remains at its held value.
+    const auto pitchReturned = controller.update({true, 27.5f}, {});
+    EXPECT_FLOAT_EQ(pitchReturned.drive, 1);
+    EXPECT_FLOAT_EQ(pitchReturned.hz, 440);
+    const auto recovered = controller.update({}, {true, 27.5f});
     EXPECT_FLOAT_EQ(recovered.drive, 0.5f);
     EXPECT_FLOAT_EQ(recovered.hz, 440);
     controller.start(Mode::Both);
-    EXPECT_FLOAT_EQ(controller.update(451, {}, {}).drive, 0);
+    EXPECT_FLOAT_EQ(controller.update({}, {}).drive, 0);
     controller.stop();
     EXPECT_EQ(controller.mode(), Mode::Off);
-    EXPECT_FLOAT_EQ(controller.update(452, {true, 5, 452}, {true, 5, 452}).drive, 0);
+    EXPECT_FLOAT_EQ(controller.update({true, 5}, {true, 5}).drive, 0);
 }
 
-TEST(ThereminControllerTest, InvalidOrDistantTargetsDoNotRefreshHeldControls) {
+TEST(ThereminControllerTest, InvalidOrDistantTargetsDoNotChangeHeldControls) {
     Controller controller;
     for (float distance : {1.0f, 51.0f, 400.0f, std::numeric_limits<float>::quiet_NaN(),
                            std::numeric_limits<float>::infinity()}) {
         controller.start(Mode::Pitch);
-        controller.update(100, {true, 5, 100}, {});
-        EXPECT_FLOAT_EQ(controller.update(349, {true, distance, 349}, {}).drive, 1);
-        EXPECT_FLOAT_EQ(controller.update(350, {true, distance, 350}, {}).drive, 0);
+        controller.update({true, 5}, {});
+        const auto held = controller.update({true, distance}, {});
+        EXPECT_FLOAT_EQ(held.drive, 1);
+        EXPECT_FLOAT_EQ(held.hz, 880);
     }
-    controller.start(Mode::Pitch);
-    const uint32_t measured = UINT32_MAX - 100;
-    EXPECT_FLOAT_EQ(controller.update(measured, {true, 5, measured}, {}).drive, 1);
-    EXPECT_FLOAT_EQ(controller.update(148, {}, {}).drive, 1);
-    EXPECT_FLOAT_EQ(controller.update(149, {}, {}).drive, 0);
 }
 
 TEST(LiveToneTest, GlidesPitchAndFadesGainWithoutRestartingIdenticalTargets) {
     sounder::LiveTone tone;
     tone.setTarget({880, 1}, 100);
-    EXPECT_FLOAT_EQ(tone.sample(100).drive, 0);
+    const auto& interpolator = tone;
+    EXPECT_FLOAT_EQ(interpolator.sample(100).drive, 0);
     EXPECT_FLOAT_EQ(tone.sample(105).hz, 550);
     EXPECT_FLOAT_EQ(tone.sample(105).drive, 1.0f / 3.0f);
     tone.setTarget({880, 1}, 110);

@@ -5,29 +5,27 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
 
 namespace sounder {
 
-// Maps accepted hand readings to musical targets. No GPIO, serial, or audio ownership.
+// Maps accepted hand readings to musical targets and holds each axis until it
+// receives a new position or the session stops. No GPIO, serial, or audio ownership.
 class ThereminController {
 public:
     enum class Mode { Off, Pitch, Volume, Both };
     static constexpr float kNearCm = 5.0f;
     static constexpr float kFarCm = HandDistanceFilter::kMaxCm;
-    static constexpr uint32_t kHoldMs = HandDistanceFilter::kHoldMs;
 
     struct Input {
         bool valid = false;
         float distanceCm = 0.0f;
-        uint32_t measuredAtMs = 0;
     };
 
     void start(Mode mode) { mode_ = mode; pitch_ = {}; volume_ = {}; }
     void stop() { start(Mode::Off); }
     Mode mode() const { return mode_; }
 
-    Frame update(uint32_t nowMs, Input pitch, Input volume) {
+    Frame update(Input pitch, Input volume) {
         remember(pitch, pitch_);
         remember(volume, volume_);
         const bool needsPitch = mode_ == Mode::Pitch || mode_ == Mode::Both;
@@ -35,7 +33,7 @@ public:
         const float hz = needsPitch && pitch_.seen
             ? 220.0f * std::pow(4.0f, 1.0f - position(pitch_.distanceCm)) : 440.0f;
         const bool ready = mode_ != Mode::Off &&
-            (!needsPitch || fresh(pitch_, nowMs)) && (!needsVolume || fresh(volume_, nowMs));
+            (!needsPitch || pitch_.seen) && (!needsVolume || volume_.seen);
         return {hz, ready ? (needsVolume ? 1.0f - position(volume_.distanceCm) : 1.0f) : 0.0f};
     }
 
@@ -53,19 +51,14 @@ private:
     struct Axis {
         bool seen = false;
         float distanceCm = 0.0f;
-        uint32_t measuredAtMs = 0;
     };
 
     static void remember(Input input, Axis& axis) {
         // Ignore distant furniture; 2..5 cm readings clamp to the near endpoint.
         if (input.valid && std::isfinite(input.distanceCm) &&
             input.distanceCm >= 2.0f && input.distanceCm <= kFarCm) {
-            axis = {true, input.distanceCm, input.measuredAtMs};
+            axis = {true, input.distanceCm};
         }
-    }
-
-    static bool fresh(const Axis& axis, uint32_t nowMs) {
-        return axis.seen && nowMs - axis.measuredAtMs < kHoldMs;
     }
 
     static float position(float distanceCm) {

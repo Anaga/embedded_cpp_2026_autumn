@@ -82,6 +82,10 @@ public:
         synth_.select(activeVoice());
     }
 
+    // Keep oscillators, sequencing, and live controls running while silencing
+    // the output. Unmuting resumes the current sound without resetting it.
+    void setMuted(bool muted) { muted_ = muted; }
+
     int16_t nextSample() {
         if (refresh_ || nowMs_ - lastControlMs_ >= kControlMs) {
             lastControlMs_ = nowMs_;
@@ -103,7 +107,7 @@ public:
             fraction_ -= kSampleRate;
             ++nowMs_;
         }
-        return sample;
+        return muted_ ? 0 : sample;
     }
 
     PlaybackStatus status() const {
@@ -132,6 +136,7 @@ private:
     uint32_t fraction_ = 0;
     uint32_t lastControlMs_ = 0;
     bool refresh_ = true;
+    bool muted_ = false;
 };
 
 } // namespace sounder

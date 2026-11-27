@@ -2,12 +2,22 @@
 
 Sounder is a theremin-style instrument in development. The current firmware
 runs on the Freenove ESP32-WROVER and sends synthesized audio to a JBL
-Flip 4 over Bluetooth Classic A2DP. The demo is controlled over USB serial.
+Flip 4 over Bluetooth Classic A2DP. Both-hand theremin mode starts automatically
+once the speaker connects and audio streams; USB serial provides manual controls.
 Two ultrasonic modules provide live pitch and volume control and can also be
 tested independently over serial. See the
 [sensor wiring and capability guide](docs/ultrasonic-sensors.md) for the pinout,
 3.3 V connections, and `sensors on` demo. The
 [project proposal](final-project-proposal.md) describes the instrument.
+An optional [GPIO25 button](docs/synth-button.md) cycles voices:
+**sine → triangle → pulse → FM → organ → sine**, once per short press/release while
+unmuted. While muted, a short click unmutes and preserves the current synth.
+Hold for **3 seconds** to toggle mute/unmute. Each hold toggles once and preserves
+the current voice, hand controls, and master volume.
+Two [status LEDs](docs/status-leds.md) use GPIO27 (red) and GPIO26 (green), each
+with its own 200 Ω resistor. Red blinks while Bluetooth is disconnected and turns
+off when connected. Green identifies sine, triangle, pulse, FM, and organ by
+blinking at 0.5, 1, 2, approximately 3, and 4 times per second, respectively.
 
 ## Build and try it
 
@@ -36,8 +46,9 @@ before uploading again.
    `src/main.cpp`, rebuild, and upload. Each boot discovers the configured
    speaker name.
 3. Wait for `Bluetooth connected` and `audio streaming` messages. The ESP32
-   sends silence until a playback command arrives; the speaker may play its
-   own connection notification. Use the speaker's buttons to set its volume.
+   automatically starts `theremin on` once per boot and waits for an initial
+   reading from both hands before sounding. A serial monitor is optional.
+   The speaker may play its own connection notification; its buttons set its volume.
 4. Send `tone 440 1500` for a first test, then `demo` for the full tour.
 
 The configured monitor sends each line when Enter is pressed. `!` is recognized
@@ -63,7 +74,10 @@ buttons remain an additional control.
 
 Run `pio device list` to find the Freenove's USB serial port. Close an existing
 monitor before opening another session on the same serial port. Volume resets
-to 35% on board restart.
+to 35% on board restart. The GPIO25 button's mute is independent of this master
+level: volume changes do not clear button mute, and unmuting preserves the level.
+Playback and hand tracking continue while button-muted; `status` shows `muted/`
+before the playback mode. Reboot clears button mute.
 
 ## Live pulse vibrato with your hands
 
@@ -77,12 +91,12 @@ volume 20
 theremin pitch
 ```
 
-Hold a hand 5–50 cm in front of the **pitch sensor (GPIO32/33)**. Moving closer
+Hold a hand 5–50 cm in front of the **pitch sensor (Trig GPIO32 / Echo GPIO34)**. Moving closer
 raises the center pitch from 220 Hz at 50 cm to 880 Hz at 5 cm; 27.5 cm gives
 440 Hz. The existing vibrato effect runs around that center at 5 Hz, ±50 cents.
 The output level stays at the master `volume` setting for this pitch-only test.
 
-Then test only the **volume sensor (GPIO13/14)**:
+Then test only the **volume sensor (Trig GPIO33 / Echo GPIO35)**:
 
 ```text
 theremin volume
@@ -99,8 +113,9 @@ theremin on
 theremin status
 ```
 
-Both sensors must first see a hand within range. Readings from 2–5 cm clamp to
-the near endpoint; readings beyond 50 cm are ignored as background. A dedicated
+Both sensors must first see a hand within range before both-hands mode sounds.
+Readings from 2–5 cm clamp to the near endpoint; readings beyond 50 cm are
+ignored as background. A dedicated
 `HandDistanceFilter` tracks each hand independently before musical mapping:
 
 - Changes over 4 cm require a second new reading within 2 cm of the candidate.
@@ -108,9 +123,19 @@ the near endpoint; readings beyond 50 cm are ignored as background. A dedicated
 - A 0.15 cm deadband reduces small stationary variations. Accepted movement
   uses a 50 ms smoothing time constant and a 30 cm/s output speed limit, so even
   confirmed large changes approach their new position gradually.
-- Only accepted readings refresh the 250 ms hand timeout. Repeated bad readings
-  cannot sustain a note forever. After expiry, reacquisition needs two consistent
-  readings; `sensors reset` clears counters without resetting hand tracking.
+- When a hand leaves the beam or its readings become unusable, that control
+  freezes at its last output indefinitely. A 250 ms gap in accepted readings
+  also freezes tracking. The other hand can continue changing its own control.
+- A returning hand needs two consistent readings, then its new absolute position
+  takes over directly, even if it differs substantially from where it left.
+  There is no need to move back through the old position or wait for the slow
+  movement limit to traverse the gap. The short audio glide still avoids clicks.
+  `sensors reset` clears counters without resetting these held positions.
+
+Leaving both sensors continues the last center pitch and amplitude, with vibrato.
+Moving through the valid range still changes the sound before leaving it; the
+value held is the last one reached, rather than the value before starting that
+movement. Move sideways out of the beam to leave at a particular level.
 
 The audio stage also glides pitch over 20 ms and fades hand amplitude over 15 ms.
 Live modes sample each sensor every 70 ms (about 14 attempts/second), alternating
@@ -127,8 +152,9 @@ and responsiveness on the actual modules.
 `theremin status` shows center pitch and hand volume targets; `status` shows
 the last rendered, vibrato-modulated pitch. Logging shows pitch and volume on
 one line at most once per second. In live mode, `raw` is the measured distance,
-`hand` is the filtered distance used by the instrument (`n/a` while stale), and
-`held` counts unconfirmed large changes. Raw pulse counts and min/max still
+`hand` is the filtered distance used by the instrument. `(hold)` marks a frozen
+position; `n/a` means no initial position has been accepted yet. `held` counts
+unconfirmed large changes. Raw pulse counts and min/max still
 include rejected spikes; `ok` only means a complete pulse in the 2–450 cm range.
 `synth` can change voices during the live test.
 
@@ -138,11 +164,21 @@ consumed; changing sensor acquisition mode also ends live audio. Queries and
 `sensors reset` keep it running. Disconnect/suspension cancels the live test;
 start it explicitly again after reconnecting.
 
+A traditional theremin continuously responds to its antenna fields: closer to
+the pitch antenna raises pitch, and closer to the volume loop reduces volume.
+See the [Moog playing guide](https://cdn.inmusicbrands.com/Moog/Theremini/Theremini%20Manual.pdf),
+pages 23–24. This project uses the requested hold-on-exit interaction and
+closer-means-louder volume mapping.
+
 ## Serial commands
 
 Commands are case-insensitive. Playback commands require a connected speaker;
 commands sent while disconnected are rejected instead of saved for later.
-Sensor commands work independently of Bluetooth. Sensors stay off at boot.
+Sensor commands work independently of Bluetooth. At boot, sensors wait for
+Bluetooth audio, then start automatically in both-hand live mode. `stop`, `!`,
+`theremin off`, a sensor acquisition command, or an accepted playback/theremin command
+cancels the pending startup. Queries, volume/synth settings, `sensors reset`, and
+rejected commands preserve it.
 
 | Command | Behavior |
 | --- | --- |
@@ -175,7 +211,7 @@ Sensor commands work independently of Bluetooth. Sensors stay off at boot.
 | `sensors reset` / `sensors off` | Clear measurement statistics / stop measurements. |
 | `theremin pitch` | Live vibrato: pitch hand controls 220–880 Hz center; fixed master volume. |
 | `theremin volume` | Live vibrato at a 440 Hz center; volume hand controls amplitude. |
-| `theremin on` | Live vibrato with both pitch and volume hands. Uses the selected synth voice. |
+| `theremin on` | Live vibrato with both pitch and volume hands. Boot default after Bluetooth audio is ready. Uses the selected synth voice. |
 | `theremin` / `theremin status` | Show live control mode, center pitch, and volume targets. |
 | `theremin off` | End live audio; sensor diagnostics continue. |
 | `status` | Speaker connection, streaming state, synth voice, rendered mode/pitch, and amplitude. |
@@ -200,7 +236,8 @@ after the showcase.
 
 On disconnect or remote suspension, pending playback is invalidated. After a
 successful connection the firmware arms three reconnect attempts, then falls
-back to discovery. Reconnection stays silent until a new playback command.
+back to discovery. Once the boot default has started or been overridden,
+reconnection stays silent until a new playback command.
 If pairing fails, confirm the speaker name and pairing mode, keep other audio
 sources disconnected, and restart the board. `status` distinguishes discovery,
 connection, and streaming.
@@ -221,6 +258,7 @@ connection, and streaming.
   in the callback path.
 - `HandDistanceFilter` rejects isolated range jumps and produces a bounded,
   smoothed hand position. `ThereminController` maps accepted readings to musical targets.
+  `ThereminStartup` requests the boot default once audio is ready and yields to manual modes.
   `LiveTone` glides pitch and amplitude in the audio task. `Vibrato` supplies
   the same 5 Hz/±50-cent modulation to the original pattern and live controls.
   Live targets use a shared snapshot rather than filling the command queue;
@@ -257,8 +295,9 @@ speaker during a tone and verify reconnection remains silent until commanded.
 Verify sweeps and vibrato remain smooth and that the serial monitor stays
 responsive during playback. These steps require an original ESP32 and Flip 4.
 For live acceptance, try `synth pulse`, `volume 20`, then `theremin pitch`,
-`theremin volume`, and `theremin on`. Verify the 5/27.5/50 cm landmarks, mute
-after removing either required hand, `volume 0`, stop, replacement by a normal
+`theremin volume`, and `theremin on`. Verify the 5/27.5/50 cm landmarks, held
+sound after removing either hand, return at a different position, `volume 0`,
+stop, replacement by a normal
 pattern, and silence after reconnect. Firmware/native tests simulate these
 controls but cannot verify physical sensor readings or the sound of the speaker.
 

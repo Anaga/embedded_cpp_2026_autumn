@@ -70,25 +70,30 @@ TEST(HandDistanceFilterTest, SuppressesSmallJitterAndFollowsGentleMovement) {
     }
 }
 
-TEST(HandDistanceFilterTest, InvalidOrDistantReadingsExpireAndReacquisitionMustRepeat) {
+TEST(HandDistanceFilterTest, InvalidOrDistantReadingsHoldAndReturnAdoptsANewAbsolutePosition) {
     Filter filter;
     filter.observe(true, 18, 0);
     filter.observe(true, 57.32f, 70);
     filter.observe(true, 113.16f, 140);
     EXPECT_TRUE(filter.sample(249).valid);
-    EXPECT_FALSE(filter.sample(250).valid);
-    filter.observe(true, 18, 280);
-    filter.observe(true, 18, 280); // Reading the same result twice is insufficient.
-    EXPECT_FALSE(filter.sample(280).valid);
-    filter.observe(true, 18.2f, 350);
-    const auto recovered = filter.sample(350);
+    EXPECT_TRUE(filter.sample(250).valid);
+    EXPECT_TRUE(filter.sample(250).holding);
+    EXPECT_FLOAT_EQ(filter.sample(25000).distanceCm, 18);
+    filter.observe(true, 39, 25070);
+    filter.observe(true, 39, 25070); // Reading the same result twice is insufficient.
+    EXPECT_TRUE(filter.sample(25070).holding);
+    EXPECT_FLOAT_EQ(filter.sample(25070).distanceCm, 18);
+    filter.observe(true, 39.2f, 25140);
+    const auto recovered = filter.sample(25140);
     EXPECT_TRUE(recovered.valid);
-    EXPECT_FLOAT_EQ(recovered.distanceCm, 18.2f);
+    EXPECT_FALSE(recovered.holding);
+    EXPECT_FLOAT_EQ(recovered.distanceCm, 39.2f);
     filter.observe(true, 40, 210); // Late old data must not rewind the tracker.
-    EXPECT_EQ(filter.sample(350).acceptedAtMs, 350U);
-    filter.observe(false, 0, 420);
-    EXPECT_TRUE(filter.sample(599).valid);
-    EXPECT_FALSE(filter.sample(600).valid);
+    EXPECT_EQ(filter.sample(25140).acceptedAtMs, 25140U);
+    filter.observe(false, 0, 25210);
+    EXPECT_TRUE(filter.sample(30000).valid);
+    EXPECT_TRUE(filter.sample(30000).holding);
+    EXPECT_FLOAT_EQ(filter.sample(30000).distanceCm, 39.2f);
 }
 
 TEST(HandDistanceFilterTest, InvalidSamplesBreakJumpConfirmationAndNeverInitialize) {
@@ -109,7 +114,7 @@ TEST(HandDistanceFilterTest, InvalidSamplesBreakJumpConfirmationAndNeverInitiali
     EXPECT_EQ(filter.sample(210).acceptedAtMs, 0U);
 }
 
-TEST(HandDistanceFilterTest, ClockRolloverAndCounterResetPreserveFreshness) {
+TEST(HandDistanceFilterTest, ClockRolloverAndCounterResetPreserveTheHeldValue) {
     Filter filter;
     const uint32_t start = UINT32_MAX - 100;
     filter.observe(true, 18, start);
@@ -119,8 +124,27 @@ TEST(HandDistanceFilterTest, ClockRolloverAndCounterResetPreserveFreshness) {
     EXPECT_TRUE(filter.sample(148).valid);
     EXPECT_EQ(filter.sample(148).heldJumps, 0U);
     EXPECT_FLOAT_EQ(filter.sample(148).distanceCm, 18);
-    EXPECT_FALSE(filter.sample(149).valid);
+    EXPECT_TRUE(filter.sample(149).valid);
+    EXPECT_TRUE(filter.sample(149).holding);
     filter.reset();
     EXPECT_FALSE(filter.sample(200).valid);
+}
+
+TEST(HandDistanceFilterTest, LeavingFreezesTheCurrentOutputInsteadOfFinishingAnOldRamp) {
+    Filter filter;
+    filter.observe(true, 20, 0);
+    filter.observe(true, 22, 70);
+    filter.sample(100);
+    filter.observe(false, 0, 105);
+    const auto left = filter.sample(105);
+    ASSERT_TRUE(left.holding);
+    EXPECT_GT(left.distanceCm, 20);
+    EXPECT_LT(left.distanceCm, 22);
+    EXPECT_FLOAT_EQ(filter.sample(60000).distanceCm, left.distanceCm);
+    filter.observe(true, 8, 60070);
+    EXPECT_FLOAT_EQ(filter.sample(60070).distanceCm, left.distanceCm);
+    filter.observe(true, 8.1f, 60140);
+    EXPECT_FLOAT_EQ(filter.sample(60140).distanceCm, 8.1f);
+    EXPECT_FALSE(filter.sample(60140).holding);
 }
 } // namespace

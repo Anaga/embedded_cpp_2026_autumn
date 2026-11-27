@@ -43,17 +43,18 @@ an excessive distance, or incorrect wiring.
 
 The current setup powers **both modules from the board's 3V3 (3.3 V) pin**,
 with Trig and Echo connected directly. No Echo voltage dividers are used.
-The GPIO assignments follow [the proposal](../final-project-proposal.md),
-which originally planned a 5 V supply and Echo dividers. Numbers below are
-**GPIO labels**, rather than physical header positions. Disconnect USB while
-wiring, then power the Freenove through USB.
+The [original proposal](../final-project-proposal.md) planned a 5 V supply,
+Echo dividers, and different GPIO assignments. The current wiring below uses
+GPIO32/33 for Trig outputs and GPIO34/35 for Echo inputs. Numbers are **GPIO
+labels**, rather than physical header positions. Disconnect USB while wiring,
+then power the Freenove through USB.
 
 | Module connection | Pitch module | Volume module |
 | --- | --- | --- |
 | Vcc | Board 3V3 (3.3 V) | Board 3V3 (3.3 V) |
 | Gnd | Board GND | Board GND |
-| Trig / Rx / SCL | GPIO32 directly | GPIO13 directly |
-| Echo / Tx / SDA | GPIO33 directly | GPIO14 directly |
+| Trig / Rx / SCL | GPIO32 directly | GPIO33 directly |
+| Echo / Tx / SDA | GPIO34 directly | GPIO35 directly |
 
 In the **front photo**, with cans facing you and pins pointing down, the order
 is **Vcc, Trig, Echo, Gnd** from left to right. It reverses when viewed from the
@@ -66,13 +67,13 @@ Freenove ESP32-WROVER         Pitch HC-SR04
 3V3 (3.3 V) ──────────────── Vcc
 GND ─────────────────────── Gnd
 GPIO32 ──────────────────── Trig
-GPIO33 ◀─────────────────── Echo
+GPIO34 ◀─────────────────── Echo
 
                              Volume HC-SR04
 3V3 (3.3 V) ──────────────── Vcc
 GND ─────────────────────── Gnd
-GPIO13 ──────────────────── Trig
-GPIO14 ◀─────────────────── Echo
+GPIO33 ──────────────────── Trig
+GPIO35 ◀─────────────────── Echo
 ```
 
 Both modules share the board's 3.3 V supply and common ground. Keep their Trig
@@ -81,8 +82,9 @@ the same pins and timing with this supply; no voltage-specific code change is
 required. This diagram documents the modules used in this project; 3.3 V supply
 support should not be assumed for every HC-SR04 revision.
 
-GPIO32/33 and GPIO13/14 avoid WROVER flash/PSRAM and boot-strapping pins.
-GPIO13/14 also serve JTAG, so reserve them for the sensors during this demo.
+GPIO32–35 avoid WROVER flash/PSRAM and boot-strapping pins.
+GPIO34 and GPIO35 are input-only: they can receive Echo but cannot drive Trig,
+as documented in the [ESP32 datasheet](https://documentation.espressif.com/esp32_datasheet_en.html).
 The [official board pinout](https://github.com/Freenove/Freenove_ESP32_WROVER_Board/blob/main/ESP32_Pinout_1.6.png)
 shows their header locations.
 
@@ -100,7 +102,10 @@ Build/upload and open the 115200 baud monitor from the repository root:
 ~/.platformio/penv/bin/pio device monitor
 ```
 
-Sensors are **off at boot**. Enter these commands in the serial monitor:
+At boot, sensors wait for a speaker connection and streaming audio, then
+`theremin on` starts automatically once. Both hands need an initial accepted
+position before sound begins. To run raw diagnostics instead, enter these
+commands in the serial monitor; changing acquisition mode overrides the boot default:
 
 ```text
 sensors pitch
@@ -170,13 +175,26 @@ within 2 cm (at most 200 ms apart). A return to the old position discards an
 isolated candidate. A 0.15 cm deadband suppresses small variations; confirmed
 movement is smoothed with a 50 ms time constant and limited to 30 cm/s. These
 named constants live in the filter class for later tuning. The first usable
-reading establishes the initial position; after the 250 ms timeout, two
-consistent readings are needed to reacquire a hand. Cached readings, invalid
-pulses, out-of-range distances, and unconfirmed jumps never refresh freshness.
+reading establishes the initial position. An invalid pulse or a distance outside
+2–50 cm freezes the filtered output; a 250 ms gap in accepted readings also
+freezes it. Each control holds its last output indefinitely while the hand is
+absent, so the other hand can keep playing independently. Initial silence lasts
+until each required control has received its first usable position.
+
+On return, two consistent new readings establish the new absolute position,
+even if it is far from the held value. The previous hand position does not need
+to be matched, and the 30 cm/s movement limit does not delay this reacquisition.
+Only the short 20 ms pitch / 15 ms amplitude audio glide blends the transition.
+Once tracking resumes, ordinary outlier filtering and gentle-motion smoothing
+apply again. Cached readings cannot satisfy the two-reading confirmation.
+Use `stop`, `!`, or `theremin off` to end a held note; disconnection/suspension
+also ends the session. The audio callback's separate 250 ms main-task watchdog
+remains independent of hand presence.
 
 In live-mode log lines, each sensor includes both `raw ... cm` and `hand ... cm`,
-plus `held N`, the number of large changes held for confirmation. `hand n/a`
-means the tracker has no fresh accepted position. Diagnostics remain raw and
+plus `held N`, the number of large changes held for confirmation. `(hold)` after
+the hand distance marks a frozen value. `hand n/a` means the tracker has never
+accepted an initial position in this session. Diagnostics remain raw and
 omit the hand fields. All attempts still update the raw counts/min/max, including
 spikes rejected by the hand tracker. `sensors reset` clears these counters while
 preserving the current hand position and smoothing state.
@@ -227,11 +245,12 @@ fraction, and crosstalk before choosing instrument controls.
 - [`UltrasonicDemo`](../include/UltrasonicDemo.h) owns two drivers, configurable
   pins, scheduling, statistics, hand filters, and serial reporting. `pitchReading()` /
   `volumeReading()` expose raw results. `pitchHandReading()` / `volumeHandReading()`
-  expose filtered positions with accepted-source timestamps; the instrument uses
-  these rather than raw distances.
+  expose filtered positions with accepted-source timestamps in live mode; raw
+  diagnostic mode leaves these empty. The instrument uses the filtered positions
+  rather than raw distances.
 - [`ThereminController`](../include/ThereminController.h) maps accepted hand
-  positions to center pitch and amplitude, preserving the
-  250 ms accepted-source timeout before muting stale inputs.
+  positions to center pitch and amplitude, holding each control independently
+  until a new position or an explicit session stop.
   [`LiveTone`](../include/LiveTone.h) ramps pitch over 20 ms and hand amplitude
   over 15 ms in the audio task;
   [`Vibrato`](../include/Vibrato.h) modulates pitch in both the original demo
