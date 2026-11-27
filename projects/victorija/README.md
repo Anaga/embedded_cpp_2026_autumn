@@ -126,6 +126,7 @@ Bot: a status card with buttons (Status, History, Mute), and the commands `/stat
 - Battery, soldered node, without calibration: 12.005 V at 12.00 V, 14.42 V at 14.40 V.
 - History run of 1.7 h: 1 packet lost of 282.
 - Mean Well N7803 no-load current: 5.07 mA.
+- End-to-end test, 27.11.2026, soldered node on USB, gateway on a power bank: all 14 checks pass (alarms, mute, node lost, sensor fault, network loss with held alerts, cold start). Node lifted to police lights on the gateway: about 2 s.
 
 ## Known problems, next steps
 
